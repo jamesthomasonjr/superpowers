@@ -162,8 +162,9 @@ function assertBrandedFallbackText(html, version = PACKAGE_VERSION) {
 }
 
 function assertTelemetryImage(html, version = PACKAGE_VERSION) {
-  const expectedUrl = `${ASSET_URL}?v=${encodeURIComponent(version)}`;
-  assert(html.includes(`src="${expectedUrl}"`), 'remote image should use the dedicated main-domain asset with only v=');
+  const telemetryVersion = `${version}+supersuit`;
+  const expectedUrl = `${ASSET_URL}?v=${encodeURIComponent(telemetryVersion)}`;
+  assert(html.includes(`src="${expectedUrl}"`), 'remote image should use the dedicated main-domain asset with only v= (fork-tagged as +supersuit)');
   assert(!html.includes('event='), 'remote image URL must not include event=');
   assert(!html.includes('surface='), 'remote image URL must not include surface=');
   assert(!html.includes('launch_id='), 'remote image URL must not include launch_id=');

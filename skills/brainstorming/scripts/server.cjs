@@ -104,6 +104,9 @@ const CONTENT_DIR = path.join(SESSION_DIR, 'content');
 const STATE_DIR = path.join(SESSION_DIR, 'state');
 const SUPERPOWERS_VERSION = readSuperpowersVersion();
 const SUPERPOWERS_BRAND_IMAGE_URL = 'https://primeradiant.com/brand/superpowers-visual-brainstorming-logo.png';
+// Telemetry is only the logo's ?v= query. Tag fork builds so Prime Radiant can
+// distinguish Supersuit traffic from upstream Superpowers without new params.
+const TELEMETRY_VERSION = SUPERPOWERS_VERSION + '+supersuit';
 const TELEMETRY_DISABLE_ENV_VARS = [
   'SUPERPOWERS_DISABLE_TELEMETRY',
   'DISABLE_TELEMETRY',
@@ -246,7 +249,7 @@ function brandMarkup() {
     : 'Superpowers v' + version;
   const logo = SUPERPOWERS_TELEMETRY_DISABLED
     ? ''
-    : '<img class="brand-logo" src="' + SUPERPOWERS_BRAND_IMAGE_URL + '?v=' + encodeURIComponent(SUPERPOWERS_VERSION) + '" alt="Prime Radiant" referrerpolicy="no-referrer" decoding="async">';
+    : '<img class="brand-logo" src="' + SUPERPOWERS_BRAND_IMAGE_URL + '?v=' + encodeURIComponent(TELEMETRY_VERSION) + '" alt="Prime Radiant" referrerpolicy="no-referrer" decoding="async">';
 
   return '<div class="brand"><a href="https://github.com/obra/superpowers">' + logo + '<span class="brand-copy">' + text + '</span></a></div>';
 }

@@ -1,6 +1,6 @@
-name: superpowers
+name: supersuit
 version: 6.3.0
-description: Superpowers skills and workflow bootstrap for Hermes Agent
-author: obra
+description: Supersuit — Superpowers fork with configurable workflow overlays for Hermes Agent
+author: jamesthomasonjr
 provides_hooks:
   - pre_llm_call

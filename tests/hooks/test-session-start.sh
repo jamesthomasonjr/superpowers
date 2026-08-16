@@ -119,9 +119,13 @@ if (typeof context !== "string" || context.trim() === "") {
   fail("injected context was empty");
 }
 
-const expectedText = process.env.EXPECT_CONTAINS || "";
-if (expectedText && !context.includes(expectedText)) {
-  fail(`context did not contain expected text: ${expectedText}`);
+const expectedTexts = (process.env.EXPECT_CONTAINS || "")
+  .split("\u001f")
+  .filter(Boolean);
+for (const expectedText of expectedTexts) {
+  if (!context.includes(expectedText)) {
+    fail(`context did not contain expected text: ${expectedText}`);
+  }
 }
 
 const forbiddenTexts = (process.env.EXPECT_NOT_CONTAINS || "")
@@ -216,6 +220,119 @@ assert_command_output \
     "$legacy_home" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
     bash "$HOOK_UNDER_TEST"
+
+echo "SessionStart workflow map injection tests"
+
+assert_command_output \
+    "Cursor injects WORKFLOW_MAP with resolved transitions" \
+    "cursor" \
+    "WORKFLOW_MAP"$'\037'"approved-architectural" \
+    "" \
+    "$cursor_home" \
+    CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    bash "$HOOK_UNDER_TEST"
+
+bad_proj="$TEST_ROOT/bad-workflow-proj"
+mkdir -p "$bad_proj/.superpowers"
+echo 'version: "nope"' > "$bad_proj/.superpowers/workflow.yaml"
+bad_proj_home="$(make_home bad-workflow-proj)"
+if output="$(cd "$bad_proj" && env -i PATH="${PATH:-}" HOME="$bad_proj_home" CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" bash "$HOOK_UNDER_TEST" 2>&1)"; then
+    if printf '%s' "$output" | \
+        EXPECT_CONTAINS="WORKFLOW_CONFIG_WARNING"$'\037'"workflow overlay invalid or resolve failed; using bundled defaults only."$'\037'"WORKFLOW_MAP"$'\037'"RESOLVED_JSON"$'\037'"approved-architectural"$'\037'"EXTREMELY_IMPORTANT"$'\037'"using-superpowers" \
+        node -e '
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8");
+let payload;
+try {
+  payload = JSON.parse(input);
+} catch (error) {
+  console.error(`invalid JSON: ${error.message}`);
+  process.exit(1);
+}
+const context = payload.additional_context;
+if (typeof context !== "string" || context.trim() === "") {
+  console.error("injected context was empty");
+  process.exit(1);
+}
+const expected = (process.env.EXPECT_CONTAINS || "").split("\u001f").filter(Boolean);
+for (const text of expected) {
+  if (!context.includes(text)) {
+    console.error(`context did not contain expected text: ${text}`);
+    process.exit(1);
+  }
+}
+'; then
+        pass "invalid project workflow falls back to bundled map with warning"
+    else
+        fail "invalid project workflow falls back to bundled map with warning"
+        echo "    output:"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "invalid project workflow falls back to bundled map with warning"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
+
+echo "SessionStart total resolve failure warning"
+
+broken_plugin="$TEST_ROOT/broken-plugin"
+mkdir -p "$broken_plugin/hooks" \
+    "$broken_plugin/scripts/lib" \
+    "$broken_plugin/skills/using-superpowers" \
+    "$broken_plugin/workflows"
+cp "$REPO_ROOT/hooks/session-start" "$broken_plugin/hooks/session-start"
+cp "$REPO_ROOT/scripts/resolve-workflow" "$broken_plugin/scripts/resolve-workflow"
+cp "$REPO_ROOT/scripts/lib/"*.py "$broken_plugin/scripts/lib/"
+printf '%s\n' '# stub using-superpowers' > "$broken_plugin/skills/using-superpowers/SKILL.md"
+printf '%s\n' 'version: "broken-bundled"' > "$broken_plugin/workflows/default.yaml"
+broken_home="$(make_home broken-bundled)"
+if output="$(cd "$TEST_ROOT" && env -i PATH="${PATH:-}" HOME="$broken_home" CURSOR_PLUGIN_ROOT="$broken_plugin" CLAUDE_PLUGIN_ROOT="$broken_plugin" bash "$broken_plugin/hooks/session-start" 2>&1)"; then
+    if printf '%s' "$output" | \
+        EXPECT_CONTAINS="WORKFLOW_CONFIG_WARNING"$'\037'"workflow resolve failed (including bundled defaults); no WORKFLOW_MAP available"$'\037'"EXTREMELY_IMPORTANT" \
+        EXPECT_NOT_CONTAINS="using bundled defaults only"$'\037'"RESOLVED_JSON" \
+        node -e '
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8");
+let payload;
+try {
+  payload = JSON.parse(input);
+} catch (error) {
+  console.error(`invalid JSON: ${error.message}`);
+  process.exit(1);
+}
+const context = payload.additional_context;
+if (typeof context !== "string" || context.trim() === "") {
+  console.error("injected context was empty");
+  process.exit(1);
+}
+const expected = (process.env.EXPECT_CONTAINS || "").split("\u001f").filter(Boolean);
+for (const text of expected) {
+  if (!context.includes(text)) {
+    console.error(`context did not contain expected text: ${text}`);
+    process.exit(1);
+  }
+}
+const forbidden = (process.env.EXPECT_NOT_CONTAINS || "").split("\u001f").filter(Boolean);
+for (const text of forbidden) {
+  if (context.includes(text)) {
+    console.error(`context unexpectedly contained: ${text}`);
+    process.exit(1);
+  }
+}
+'; then
+        pass "total resolve failure warns without claiming bundled map"
+    else
+        fail "total resolve failure warns without claiming bundled map"
+        echo "    output:"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "total resolve failure warns without claiming bundled map"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
 
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "STATUS: FAILED ($FAILURES failure(s))"

@@ -45,7 +45,8 @@ override it:
 - **Architectural** — new projects, new subsystems, changes that
   restructure how components fit together or alter interfaces others
   depend on. Follow the full process: questions, approaches, sectioned
-  design, written spec, then the writing-plans skill.
+  design, written spec, then emit `approved-architectural` and follow the
+  workflow map (bundled default points at writing-plans).
 
 When in doubt between two paths, take the heavier one. The ratchet is
 one-way: hidden complexity discovered mid-task upgrades the path —
@@ -83,13 +84,14 @@ your path and complete them in order.
 3. **Get approval** — a nod is enough
 4. **Investigate** — as cheaply as correctness allows
 5. **Report findings** — a recommendation; label anything built as throwaway
+6. **Emit outcome** — after reporting, emit `approved-spike` (see Outcomes)
 
 **Bounded:**
 1. **Explore project context** — check files, docs, recent commits
 2. **Ask clarifying questions** — one at a time, the ones that matter
 3. **Present short design in chat** — approach, files touched, testing
 4. **Get approval** — STOP and wait for an explicit yes; presenting the design and starting in the same breath is skipping the gate
-5. **Implement** — proceed with the normal development workflow (TDD applies); no plan document
+5. **Emit outcome** — after approval, emit `approved-bounded` and follow the workflow map (see Outcomes). Do not hardcode implementation as the next step inside this skill.
 
 **Architectural:**
 1. **Explore project context** — check files, docs, recent commits
@@ -100,7 +102,19 @@ your path and complete them in order.
 6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
 7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+9. **Emit outcome** — after user approves spec, emit `approved-architectural` (see Outcomes)
+
+## Outcomes
+
+When this skill finishes, emit exactly one outcome (workflow map selects next):
+
+| Path | Outcome | Meaning |
+|------|---------|---------|
+| Architectural, human approved written spec | `approved-architectural` | Design accepted; map default goes to writing-plans |
+| Bounded, human approved in-chat design | `approved-bounded` | Map default is `null` — continue session (description-triggered skills such as TDD apply). If map says `wait`, stop. |
+| Spike, probe complete | `approved-spike` | Map default is `null` — report was the deliverable |
+
+Do not invent a next pipeline skill. Follow the resolved workflow map.
 
 ## Process Flow
 
@@ -111,8 +125,9 @@ digraph brainstorming {
     "Ask clarifying questions (bounded)" [shape=box];
     "Present short design in chat" [shape=box];
     "Human approves?" [shape=diamond];
-    "Investigate; report recommendation" [shape=doublecircle];
-    "Implement via normal workflow (no plan doc)" [shape=doublecircle];
+    "Investigate; report recommendation" [shape=box];
+    "Emit outcome: approved-spike" [shape=doublecircle];
+    "Emit outcome: approved-bounded" [shape=doublecircle];
     "Explore project context" [shape=box];
     "Ask clarifying questions" [shape=box];
     "Propose 2-3 approaches" [shape=box];
@@ -121,7 +136,7 @@ digraph brainstorming {
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
-    "Invoke writing-plans skill" [shape=doublecircle];
+    "Emit outcome: approved-architectural" [shape=doublecircle];
     "Hidden complexity? Upgrade path" [shape=box];
 
     "Classify: spike / bounded / architectural" -> "Present question + probe (2-3 sentences)" [label="spike"];
@@ -131,7 +146,8 @@ digraph brainstorming {
     "Ask clarifying questions (bounded)" -> "Present short design in chat";
     "Present short design in chat" -> "Human approves?";
     "Human approves?" -> "Investigate; report recommendation" [label="spike: yes"];
-    "Human approves?" -> "Implement via normal workflow (no plan doc)" [label="bounded: yes"];
+    "Investigate; report recommendation" -> "Emit outcome: approved-spike";
+    "Human approves?" -> "Emit outcome: approved-bounded" [label="bounded: yes"];
     "Hidden complexity? Upgrade path" -> "Classify: spike / bounded / architectural";
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -142,16 +158,17 @@ digraph brainstorming {
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
-    "User reviews spec?" -> "Invoke writing-plans skill" [label="approved"];
+    "User reviews spec?" -> "Emit outcome: approved-architectural" [label="approved"];
 }
 ```
 
-**Terminal states are path-bound.** Architectural: the ONLY skill you
-invoke after brainstorming is writing-plans — never frontend-design,
-mcp-builder, or any other implementation skill. Bounded: after
-approval, implementation proceeds directly through the normal
-development workflow; no plan document. Spike: the terminal state is a
-reported recommendation.
+**Terminal states are path-bound.** Every path ends by emitting an outcome
+and following the workflow map — never invent the next pipeline skill.
+Architectural: emit `approved-architectural` (bundled default →
+writing-plans). Bounded: emit `approved-bounded` (bundled default `null`
+means continue the session; description-triggered skills such as TDD
+apply — if the map says `wait`, stop and ask the human). Spike: emit
+`approved-spike` after reporting (bundled default `null`).
 
 ## The Process
 
@@ -227,8 +244,9 @@ Wait for the user's response. If they request changes, make them and re-run the 
 
 **Implementation:**
 
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
+- Emit `approved-architectural` and follow the resolved workflow map
+  (bundled default routes to writing-plans for the implementation plan)
+- Do not invent a next pipeline skill or invoke implementation skills directly
 
 ## Visual Companion
 

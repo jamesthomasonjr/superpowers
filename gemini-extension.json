@@ -1,6 +1,6 @@
 {
-  "name": "superpowers",
-  "description": "Core skills library: TDD, debugging, collaboration patterns, and proven techniques",
+  "name": "supersuit",
+  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
   "version": "6.3.0",
   "contextFileName": "GEMINI.md"
 }

@@ -23,12 +23,33 @@ This is not negotiable. You cannot rationalize your way out of this.
 
 Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
 
+## Workflow map
+
+Superpowers handoffs are owned by a resolved workflow map (bundled defaults,
+optional `~/.superpowers/workflow.yaml`, optional `.superpowers/workflow.yaml`).
+
+When SessionStart did not inject a `<WORKFLOW_MAP>` block, run
+`resolve-workflow` from the plugin (or read its JSON stdout) before the first
+skill handoff and whenever overlays may have changed.
+
+Rules:
+1. Skills are terminal units — do not invent pipeline handoffs from memory.
+2. When a skill finishes, emit its declared outcome, then select `to` from the
+   map for `(from=<logical id>, on=<outcome>)`.
+3. `to: <id>` — invoke that logical id. Resolve via the map's skills registry:
+   `path` → `skill` alias → same name.
+4. `to: null` — no pipeline handoff; continue the session. Description-triggered
+   skills (TDD, debugging, verification, etc.) still apply.
+5. `to: wait` — stop and ask your human partner what to do next.
+6. If the outcome is missing from the map, treat it as `wait`.
+7. User instructions still take precedence over skills and the workflow map.
+
 ## Skill Priority
 
 When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
 
-- "Let's build X" → superpowers:brainstorming first, then implementation skills.
-- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+- "Let's build X" → supersuit:brainstorming first, then implementation skills.
+- "Fix this bug" → supersuit:systematic-debugging first, then domain skills.
 
 ## Red Flags
 

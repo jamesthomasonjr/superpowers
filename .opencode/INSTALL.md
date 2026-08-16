@@ -1,4 +1,4 @@
-# Installing Superpowers for OpenCode
+# Installing Supersuit for OpenCode
 
 ## Prerequisites
 
@@ -6,25 +6,28 @@
 
 ## Installation
 
-Add superpowers to the `plugin` array in your `opencode.json` (global or project-level):
+Add this fork to the `plugin` array in your `opencode.json` (global or project-level).
+The package id is **`supersuit`**.
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
+  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
 }
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
 registers all skills.
 
-Verify by asking: "Tell me about your superpowers"
+Verify by asking: "Tell me about your skills" or checking that workflow-map
+bootstrap context is present after session start.
 
 OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
-another harness, install Superpowers separately for each one.
+another harness, install Supersuit separately for each one. Do not enable
+upstream Superpowers in the same profile.
 
 ## Migrating from the old symlink-based install
 
-If you previously installed superpowers using `git clone` and symlinks, remove the old setup:
+If you previously installed via `git clone` and symlinks, remove the old setup:
 
 ```bash
 # Remove old symlinks
@@ -48,18 +51,21 @@ use skill tool to list skills
 use skill tool to load brainstorming
 ```
 
+Stock behavior matches Superpowers. Optional workflow overlays:
+see [docs/workflow-config.md](../docs/workflow-config.md).
+
 ## Updating
 
-OpenCode installs Superpowers through a git-backed package spec. Some OpenCode
+OpenCode installs the plugin through a git-backed package spec. Some OpenCode
 and Bun versions pin that resolved git dependency in a lockfile or cache, so a
-restart may not pick up the newest Superpowers commit. If updates do not appear,
+restart may not pick up the newest commit. If updates do not appear,
 clear OpenCode's package cache or reinstall the plugin.
 
-To pin a specific version:
+To pin a specific ref:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git#v5.0.3"]
+  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git#cursor/modular-functionality-aa6a"]
 }
 ```
 
@@ -67,7 +73,7 @@ To pin a specific version:
 
 ### Plugin not loading
 
-1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -i superpowers`
+1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -iE 'supersuit|superpowers'`
 2. Verify the plugin line in your `opencode.json`
 3. Make sure you're running a recent version of OpenCode
 
@@ -80,14 +86,14 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install superpowers@git+https://github.com/obra/superpowers.git --prefix "$HOME\.config\opencode"
+npm install supersuit@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
 
 ```json
 {
-  "plugin": ["~/.config/opencode/node_modules/superpowers"]
+  "plugin": ["~/.config/opencode/node_modules/supersuit"]
 }
 ```
 
@@ -111,5 +117,6 @@ Skills speak in actions ("create a todo", "dispatch a subagent", "read a file").
 
 ## Getting Help
 
-- Report issues: https://github.com/obra/superpowers/issues
-- Full documentation: https://github.com/obra/superpowers/blob/main/docs/README.opencode.md
+- Report issues: https://github.com/jamesthomasonjr/superpowers/issues
+- Full documentation: https://github.com/jamesthomasonjr/superpowers/blob/main/docs/README.opencode.md
+- Upstream Superpowers: https://github.com/obra/superpowers
