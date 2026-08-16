@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -55,13 +58,27 @@ def merge_workflows(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, 
             result["entries"][key] = value
 
     if "transitions" in overlay:
-        overlay_froms = {transition["from"] for transition in overlay["transitions"]}
+        overlay_transitions = overlay["transitions"]
+        if not isinstance(overlay_transitions, list):
+            raise WorkflowResolveError("overlay transitions must be a sequence")
+        overlay_froms: set[str] = set()
+        for transition in overlay_transitions:
+            if not isinstance(transition, dict):
+                raise WorkflowResolveError(
+                    f"overlay transition must be a mapping: {transition!r}"
+                )
+            from_id = transition.get("from")
+            if not isinstance(from_id, str) or not from_id.strip():
+                raise WorkflowResolveError(
+                    f"overlay transition missing valid from: {transition!r}"
+                )
+            overlay_froms.add(from_id)
         result["transitions"] = [
             transition
             for transition in result["transitions"]
-            if transition["from"] not in overlay_froms
+            if transition.get("from") not in overlay_froms
         ]
-        result["transitions"].extend(overlay["transitions"])
+        result["transitions"].extend(overlay_transitions)
 
     return result
 
@@ -209,3 +226,63 @@ def resolve_workflow(
         "transitions": merged.get("transitions") or [],
         "ok": True,
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Resolve workflow config and print JSON to stdout."""
+    parser = argparse.ArgumentParser(
+        description="Resolve layered workflow configuration to JSON."
+    )
+    parser.add_argument(
+        "--plugin-root",
+        help="Superpowers plugin root (default: SUPERPOWERS_PLUGIN_ROOT or script location)",
+    )
+    parser.add_argument(
+        "--project-root",
+        help="Project root for overlay and path resolution (default: cwd)",
+    )
+    parser.add_argument(
+        "--user-home",
+        help="User home for ~/.superpowers/workflow.yaml (default: HOME)",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output",
+    )
+    args = parser.parse_args(argv)
+
+    script_dir = Path(__file__).resolve().parent
+    default_plugin_root = script_dir.parent.parent
+
+    plugin_root = Path(
+        args.plugin_root
+        or os.environ.get("SUPERPOWERS_PLUGIN_ROOT", str(default_plugin_root))
+    )
+    project_root = Path(args.project_root or os.getcwd())
+    user_home = Path(
+        args.user_home or os.environ.get("HOME", os.path.expanduser("~"))
+    )
+
+    try:
+        resolved = resolve_workflow(
+            plugin_root=plugin_root,
+            project_root=project_root,
+            user_home=user_home,
+        )
+    except WorkflowResolveError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    output = {
+        "version": resolved["version"],
+        "skills": resolved["skills"],
+        "entries": resolved["entries"],
+        "transitions": resolved["transitions"],
+    }
+    print(json.dumps(output, indent=2 if args.pretty else None))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

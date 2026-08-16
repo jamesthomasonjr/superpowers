@@ -4,6 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FAILURES=0
+TEST_ROOT="$(mktemp -d)"
+TEST_HOME="$TEST_ROOT/home"
+mkdir -p "$TEST_HOME"
+
+cleanup() {
+  rm -rf "$TEST_ROOT"
+}
+trap cleanup EXIT
 
 pass() { echo "  [PASS] $1"; }
 fail() { echo "  [FAIL] $1"; FAILURES=$((FAILURES + 1)); }
@@ -127,6 +135,68 @@ then
   pass "default handoffs"
 else
   fail "default handoffs"
+fi
+
+echo "=== merge rejects transition missing from ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import WorkflowResolveError, merge_workflows
+
+base = {"version": 1, "skills": {}, "entries": {}, "transitions": []}
+overlay = {"transitions": [{"on": "approved-architectural", "to": "writing-plans"}]}
+try:
+    merge_workflows(base, overlay)
+    raise SystemExit("expected WorkflowResolveError")
+except WorkflowResolveError:
+    pass
+print("ok")
+PY
+then
+  pass "merge rejects transition missing from"
+else
+  fail "merge rejects transition missing from"
+fi
+
+echo "=== CLI resolves bundled defaults ==="
+if OUT="$(cd "$REPO_ROOT" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$REPO_ROOT" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["version"]==1; assert any(t["from"]=="brainstorming" and t["on"]=="approved-architectural" and t["to"]=="writing-plans" for t in d["transitions"])'; then
+  pass "CLI resolves bundled defaults"
+else
+  fail "CLI resolves bundled defaults"
+fi
+
+echo "=== CLI project overlay wait ==="
+PROJ="$TEST_ROOT/proj"
+mkdir -p "$PROJ/.superpowers"
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="wait"'; then
+  pass "CLI project overlay wait"
+else
+  fail "CLI project overlay wait"
+fi
+
+echo "=== CLI invalid config exits 1 ==="
+mkdir -p "$PROJ/.superpowers"
+echo 'version: "nope"' > "$PROJ/.superpowers/workflow.yaml"
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err.txt"; then
+  fail "invalid config should exit 1"
+else
+  pass "invalid config exits 1"
 fi
 
 if [[ "$FAILURES" -gt 0 ]]; then
