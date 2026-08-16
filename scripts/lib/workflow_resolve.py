@@ -162,7 +162,6 @@ def validate_workflow(
 
         from_id = transition.get("from")
         on = transition.get("on")
-        to = transition.get("to") if "to" in transition else None
 
         if not isinstance(from_id, str) or not from_id.strip():
             errors.append(f"transition missing valid from: {transition!r}")
@@ -170,6 +169,11 @@ def validate_workflow(
         if not isinstance(on, str) or not on.strip():
             errors.append(f"transition missing valid on: {transition!r}")
             continue
+        if "to" not in transition:
+            errors.append(f"transition missing to: {transition!r}")
+            continue
+
+        to = transition.get("to")
 
         key = (from_id, on)
         if key in seen:
@@ -206,6 +210,10 @@ def resolve_workflow(
         if user_path.is_file():
             try:
                 user_doc = load_yaml(user_path.read_text())
+            except OSError as exc:
+                raise WorkflowResolveError(
+                    f"failed to read user workflow: {exc}"
+                ) from exc
             except YAMLError as exc:
                 raise WorkflowResolveError(
                     f"failed to parse user workflow: {exc}"
@@ -220,6 +228,10 @@ def resolve_workflow(
         if project_path.is_file():
             try:
                 project_doc = load_yaml(project_path.read_text())
+            except OSError as exc:
+                raise WorkflowResolveError(
+                    f"failed to read project workflow: {exc}"
+                ) from exc
             except YAMLError as exc:
                 raise WorkflowResolveError(
                     f"failed to parse project workflow: {exc}"

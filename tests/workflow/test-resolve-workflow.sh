@@ -247,6 +247,94 @@ else
   fail "CLI bundled-only resolves defaults despite invalid overlay"
 fi
 
+echo "=== validate rejects transition missing to ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import validate_workflow
+
+errors = validate_workflow(
+    {
+        "version": 1,
+        "skills": {"brainstorming": {}, "writing-plans": {}},
+        "entries": {},
+        "transitions": [
+            {"from": "brainstorming", "on": "approved-architectural"},
+        ],
+    },
+    project_root=Path("."),
+    bundled_skills={"brainstorming", "writing-plans"},
+)
+assert any("missing to" in e for e in errors), errors
+print("ok")
+PY
+then
+  pass "validate rejects transition missing to"
+else
+  fail "validate rejects transition missing to"
+fi
+
+echo "=== resolve wraps overlay OSError ==="
+if python3 - "$REPO_ROOT" "$TEST_ROOT" <<'PY'
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import WorkflowResolveError, resolve_workflow
+
+repo = Path(sys.argv[1])
+home = Path(sys.argv[2]) / "oserror-home"
+proj = Path(sys.argv[2]) / "oserror-proj"
+home.mkdir(parents=True)
+proj.mkdir(parents=True)
+(user_dir := home / ".superpowers").mkdir()
+user_path = user_dir / "workflow.yaml"
+user_path.write_text("version: 1\n", encoding="utf-8")
+
+real_read_text = Path.read_text
+
+def flaky_read_text(self, *args, **kwargs):
+    if self == user_path:
+        raise PermissionError("simulated unreadable overlay")
+    return real_read_text(self, *args, **kwargs)
+
+with patch.object(Path, "read_text", flaky_read_text):
+    try:
+        resolve_workflow(plugin_root=repo, project_root=proj, user_home=home)
+        raise SystemExit("expected WorkflowResolveError")
+    except WorkflowResolveError as exc:
+        assert "failed to read user workflow" in str(exc), exc
+print("ok")
+PY
+then
+  pass "resolve wraps overlay OSError"
+else
+  fail "resolve wraps overlay OSError"
+fi
+
+echo "=== CLI unreadable overlay exits cleanly ==="
+mkdir -p "$PROJ/.superpowers"
+echo 'version: 1' > "$PROJ/.superpowers/workflow.yaml"
+chmod 000 "$PROJ/.superpowers/workflow.yaml"
+set +e
+"$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-unreadable.txt"
+cli_status=$?
+set -e
+chmod 644 "$PROJ/.superpowers/workflow.yaml" || true
+if grep -qi 'Traceback' "$TEST_ROOT/err-unreadable.txt"; then
+  fail "unreadable overlay should not traceback"
+  sed 's/^/    /' "$TEST_ROOT/err-unreadable.txt"
+elif [[ "$cli_status" -ne 0 ]] && grep -qi 'failed to read project workflow' "$TEST_ROOT/err-unreadable.txt"; then
+  pass "CLI unreadable overlay exits cleanly"
+elif [[ "$cli_status" -eq 0 ]]; then
+  pass "CLI unreadable overlay exits cleanly (overlay readable under this environment)"
+else
+  fail "CLI unreadable overlay exits cleanly"
+  sed 's/^/    /' "$TEST_ROOT/err-unreadable.txt"
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1

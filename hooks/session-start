@@ -43,7 +43,7 @@ elif resolved_json=$("${PLUGIN_ROOT}/scripts/resolve-workflow" \
     resolved_json_escaped=$(escape_for_json "$resolved_json")
     workflow_suffix="\nWORKFLOW_CONFIG_WARNING: workflow overlay invalid or resolve failed; using bundled defaults only.${workflow_map_header}${resolved_json_escaped}\n</WORKFLOW_MAP>"
 else
-    workflow_suffix="\nWORKFLOW_CONFIG_WARNING: workflow overlay invalid or resolve failed; using bundled defaults only."
+    workflow_suffix="\nWORKFLOW_CONFIG_WARNING: workflow resolve failed (including bundled defaults); no WORKFLOW_MAP available. Do not invent handoffs — ask the human."
 fi
 session_context="${session_context}${workflow_suffix}"
 

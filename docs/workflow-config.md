@@ -36,6 +36,8 @@ Add `--pretty` for readable JSON.
 | `null` | No pipeline handoff — continue the session. Description-triggered skills (TDD, debugging, etc.) still apply. |
 | `wait` | Stop and ask your human partner what to do next. |
 
+Every transition **must** include an explicit `to` key. Omitting `to` is a validation error (it is not treated as `null`). Write `to: null` when you want continue-session.
+
 If a skill emits an outcome with no matching transition, treat it as `wait`.
 
 ## Example: replace brainstorming with a custom skill path
@@ -92,8 +94,8 @@ The resolver validates merged config before emitting JSON. Common failures:
 
 - `version` must be `1`
 - duplicate `(from, on)` pairs
-- `to` must be `null`, `wait`, or a known logical skill id
+- each transition must include `to` (`null`, `wait`, or a known logical skill id)
 - `path` must point at a directory containing `SKILL.md`
 - a skill entry cannot set both `skill` and `path`
 
-On SessionStart failure, the hook injects a warning and continues without the overlay map. Fix the YAML and start a new session, or run `resolve-workflow` manually to see errors on stderr.
+On SessionStart overlay failure, the hook warns and injects the bundled map. If even bundled resolve fails, it warns that no `WORKFLOW_MAP` is available (and does not claim defaults are in effect). Fix the YAML and start a new session, or run `resolve-workflow` manually to see errors on stderr.

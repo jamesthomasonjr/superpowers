@@ -154,7 +154,7 @@ transitions:
 | `entries` | Optional remaps for bootstrap “when this kind of work starts, prefer this logical id.” Does not replace description-based discovery; it disambiguates when multiple skills could apply. Per-key replace on overlay (flat string map). |
 | `transitions[].from` | Logical id of the skill that just finished. |
 | `transitions[].on` | Outcome string declared by that skill. |
-| `transitions[].to` | Next logical id, `null` (continue session, no pipeline handoff), or `wait` (stop for the human). |
+| `transitions[].to` | **Required.** Next logical id, `null` (continue session, no pipeline handoff), or `wait` (stop for the human). Omitting `to` is a validation error (not silently treated as `null`). |
 
 ### Merge algorithm
 
