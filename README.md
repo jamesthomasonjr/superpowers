@@ -58,7 +58,7 @@ Keeping the install id as `superpowers` while shipping a fork is confusing for u
 | Skill namespace | **`supersuit:<skill>`** | Matches plugin id (e.g. `supersuit:brainstorming`) |
 | Bootstrap skill folder | `using-superpowers` | Still teaches the Superpowers methodology; invoked as `supersuit:using-superpowers` |
 | Config dirs | **`.superpowers/`** / `~/.superpowers/` | Workflow overlays stay compatible with the design already documented; no forced migration |
-| Env telemetry flag | `SUPERPOWERS_DISABLE_TELEMETRY` | Inherited from upstream skill code for now |
+| Env telemetry flag | `SUPERPOWERS_DISABLE_TELEMETRY` | Inherited from upstream; logo `?v=` is tagged `+supersuit` when enabled |
 
 **Do not enable upstream Superpowers and Supersuit in the same harness profile.** They overlap in skills and will fight over triggers.
 
@@ -344,4 +344,4 @@ MIT License - see LICENSE file for details (same as upstream Superpowers).
 
 ## Visual companion telemetry
 
-Because skills and plugins don't provide any feedback to creators, upstream Superpowers includes optional visual-companion logo telemetry from Prime Radiant. By default, the Prime Radiant logo on brainstorming's optional visual companion feature is loaded from their website. It includes the version of the plugin in use. It does not include any details about your project, prompt, or coding agent. It's 100% optional. To disable this, set the environment variable `SUPERPOWERS_DISABLE_TELEMETRY` to any true value. The plugin also honors Claude Code's `DISABLE_TELEMETRY` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` opt-outs.
+Because skills and plugins don't provide any feedback to creators, upstream Superpowers includes optional visual-companion logo telemetry from Prime Radiant. By default, the Prime Radiant logo on brainstorming's optional visual companion feature is loaded from their website. It includes the version of the plugin in use. **Supersuit appends `+supersuit` to that version** (for example `6.3.0+supersuit`) so Prime Radiant can tell fork traffic from upstream Superpowers. It does not include any details about your project, prompt, or coding agent. It's 100% optional. To disable this, set the environment variable `SUPERPOWERS_DISABLE_TELEMETRY` to any true value. The plugin also honors Claude Code's `DISABLE_TELEMETRY` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` opt-outs.
