@@ -32,10 +32,17 @@ For each task:
 
 ### Step 3: Complete Development
 
-After all tasks complete and verified:
-- Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-- Follow that skill to verify tests, present options, execute choice
+After all tasks complete and verified, emit `complete` (see Outcomes).
+
+## Outcomes
+
+When all tasks are complete and verified, emit:
+
+| Outcome | Meaning |
+|---------|---------|
+| `complete` | Implementation finished; map default routes to finishing-a-development-branch |
+
+Do not invent the next skill. Follow the workflow map.
 
 ## When to Stop and Ask for Help
 
