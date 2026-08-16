@@ -199,6 +199,14 @@ else
   pass "invalid config exits 1"
 fi
 
+echo "=== CLI bundled-only ignores invalid overlay ==="
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" --bundled-only)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["version"]==1; assert any(t["from"]=="brainstorming" and t["on"]=="approved-architectural" and t["to"]=="writing-plans" for t in d["transitions"])'; then
+  pass "CLI bundled-only resolves defaults despite invalid overlay"
+else
+  fail "CLI bundled-only resolves defaults despite invalid overlay"
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1

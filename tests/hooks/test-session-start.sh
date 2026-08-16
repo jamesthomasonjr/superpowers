@@ -239,7 +239,7 @@ echo 'version: "nope"' > "$bad_proj/.superpowers/workflow.yaml"
 bad_proj_home="$(make_home bad-workflow-proj)"
 if output="$(cd "$bad_proj" && env -i PATH="${PATH:-}" HOME="$bad_proj_home" CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" bash "$HOOK_UNDER_TEST" 2>&1)"; then
     if printf '%s' "$output" | \
-        EXPECT_CONTAINS="WORKFLOW_CONFIG_WARNING"$'\037'"EXTREMELY_IMPORTANT"$'\037'"using-superpowers" \
+        EXPECT_CONTAINS="WORKFLOW_CONFIG_WARNING"$'\037'"workflow overlay invalid or resolve failed; using bundled defaults only."$'\037'"WORKFLOW_MAP"$'\037'"RESOLVED_JSON"$'\037'"approved-architectural"$'\037'"EXTREMELY_IMPORTANT"$'\037'"using-superpowers" \
         node -e '
 const fs = require("fs");
 const input = fs.readFileSync(0, "utf8");
@@ -262,19 +262,15 @@ for (const text of expected) {
     process.exit(1);
   }
 }
-if (context.includes("RESOLVED_JSON")) {
-  console.error("invalid project config should not inject resolved workflow JSON");
-  process.exit(1);
-}
 '; then
-        pass "invalid project workflow emits warning and still bootstraps using-superpowers"
+        pass "invalid project workflow falls back to bundled map with warning"
     else
-        fail "invalid project workflow emits warning and still bootstraps using-superpowers"
+        fail "invalid project workflow falls back to bundled map with warning"
         echo "    output:"
         echo "$output" | sed 's/^/      /'
     fi
 else
-    fail "invalid project workflow emits warning and still bootstraps using-superpowers"
+    fail "invalid project workflow falls back to bundled map with warning"
     echo "    hook exited non-zero"
     echo "$output" | sed 's/^/      /'
 fi

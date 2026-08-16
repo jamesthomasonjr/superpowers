@@ -177,6 +177,7 @@ def resolve_workflow(
     plugin_root: Path,
     project_root: Path,
     user_home: Path,
+    bundled_only: bool = False,
 ) -> dict[str, Any]:
     """Load, merge, validate, and return the resolved workflow graph."""
     default_path = plugin_root / "workflows" / "default.yaml"
@@ -190,25 +191,28 @@ def resolve_workflow(
     if not isinstance(merged, dict):
         raise WorkflowResolveError("bundled workflow must be a mapping")
 
-    user_path = user_home / ".superpowers" / "workflow.yaml"
-    if user_path.is_file():
-        try:
-            user_doc = load_yaml(user_path.read_text())
-        except YAMLError as exc:
-            raise WorkflowResolveError(f"failed to parse user workflow: {exc}") from exc
-        if isinstance(user_doc, dict):
-            merged = merge_workflows(merged, user_doc)
+    if not bundled_only:
+        user_path = user_home / ".superpowers" / "workflow.yaml"
+        if user_path.is_file():
+            try:
+                user_doc = load_yaml(user_path.read_text())
+            except YAMLError as exc:
+                raise WorkflowResolveError(
+                    f"failed to parse user workflow: {exc}"
+                ) from exc
+            if isinstance(user_doc, dict):
+                merged = merge_workflows(merged, user_doc)
 
-    project_path = project_root / ".superpowers" / "workflow.yaml"
-    if project_path.is_file():
-        try:
-            project_doc = load_yaml(project_path.read_text())
-        except YAMLError as exc:
-            raise WorkflowResolveError(
-                f"failed to parse project workflow: {exc}"
-            ) from exc
-        if isinstance(project_doc, dict):
-            merged = merge_workflows(merged, project_doc)
+        project_path = project_root / ".superpowers" / "workflow.yaml"
+        if project_path.is_file():
+            try:
+                project_doc = load_yaml(project_path.read_text())
+            except YAMLError as exc:
+                raise WorkflowResolveError(
+                    f"failed to parse project workflow: {exc}"
+                ) from exc
+            if isinstance(project_doc, dict):
+                merged = merge_workflows(merged, project_doc)
 
     bundled_skills = set(discover_known_skills(plugin_root))
     errors = validate_workflow(
@@ -250,6 +254,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Pretty-print JSON output",
     )
+    parser.add_argument(
+        "--bundled-only",
+        action="store_true",
+        help="Skip user and project overlays; resolve bundled defaults only",
+    )
     args = parser.parse_args(argv)
 
     script_dir = Path(__file__).resolve().parent
@@ -269,6 +278,7 @@ def main(argv: list[str] | None = None) -> int:
             plugin_root=plugin_root,
             project_root=project_root,
             user_home=user_home,
+            bundled_only=args.bundled_only,
         )
     except WorkflowResolveError as exc:
         print(str(exc), file=sys.stderr)
