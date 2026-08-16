@@ -1,4 +1,44 @@
 version: 1
-skills: {}
-entries: {}
-transitions: []
+
+skills:
+  brainstorming: {}
+  writing-plans: {}
+  subagent-driven-development: {}
+  executing-plans: {}
+  finishing-a-development-branch: {}
+  using-git-worktrees: {}
+  test-driven-development: {}
+  systematic-debugging: {}
+  requesting-code-review: {}
+  receiving-code-review: {}
+  verification-before-completion: {}
+  dispatching-parallel-agents: {}
+  writing-skills: {}
+  using-superpowers: {}
+
+entries:
+  creative-work: brainstorming
+  bugfix: systematic-debugging
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: writing-plans
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+  - from: writing-plans
+    on: subagent-driven
+    to: subagent-driven-development
+  - from: writing-plans
+    on: inline
+    to: executing-plans
+  - from: subagent-driven-development
+    on: complete
+    to: finishing-a-development-branch
+  - from: executing-plans
+    on: complete
+    to: finishing-a-development-branch
