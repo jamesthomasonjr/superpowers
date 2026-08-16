@@ -1,7 +1,7 @@
 {
-  "name": "superpowers",
+  "name": "supersuit",
   "version": "6.3.0",
-  "description": "Superpowers skills and runtime bootstrap for coding agents",
+  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
   "type": "module",
   "main": ".opencode/plugins/superpowers.js",
   "keywords": [

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionStart hook for superpowers plugin
+# SessionStart hook for supersuit plugin
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ escape_for_json() {
 }
 
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
-session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Below is the full content of your 'superpowers:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
+session_context="<EXTREMELY_IMPORTANT>\nYou have Supersuit (Superpowers-compatible skills).\n\n**Below is the full content of your 'supersuit:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
 
 workflow_map_header="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: path, then skill alias, else same name).\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
 

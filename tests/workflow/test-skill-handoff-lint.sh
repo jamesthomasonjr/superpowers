@@ -4,7 +4,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAILURES=0
 # Forbidden *directive* patterns in pipeline skills (allow Outcomes descriptive text via careful patterns)
 for f in brainstorming writing-plans executing-plans subagent-driven-development; do
-  if rg -n "REQUIRED SUB-SKILL: Use superpowers:(writing-plans|subagent-driven-development|executing-plans|finishing-a-development-branch)" \
+  if rg -n "REQUIRED SUB-SKILL: Use supersuit:(writing-plans|subagent-driven-development|executing-plans|finishing-a-development-branch)" \
       "$REPO_ROOT/skills/$f/SKILL.md"; then
     echo "FAIL: $f still has pipeline REQUIRED SUB-SKILL"
     FAILURES=$((FAILURES+1))

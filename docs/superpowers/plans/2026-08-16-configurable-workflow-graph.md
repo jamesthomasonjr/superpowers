@@ -4,6 +4,8 @@
 
 **Goal:** Ship a data-driven workflow map (bundled defaults + user/project overlays) that owns skill handoffs, with SessionStart injection and pipeline skills converted to Outcomes — without changing the default Superpowers happy path.
 
+**Product:** This fork is branded **Supersuit** with plugin/package id `supersuit`. Keep `.superpowers/` config paths and the `using-superpowers` bootstrap skill folder for methodology continuity; qualified skill refs use `supersuit:<skill>`.
+
 **Architecture:** A zero-dependency Python resolver merges `workflows/default.yaml` ← `~/.superpowers/workflow.yaml` ← `.superpowers/workflow.yaml`, validates, and prints JSON. SessionStart appends the resolved map beside `using-superpowers`. Pipeline skills stop naming the next skill and emit stable outcomes instead; the map chooses `to` (`<id>` | `null` | `wait`).
 
 **Tech Stack:** Python 3 stdlib only (no PyYAML dependency — ship a minimal YAML subset loader for our schema); Bash hooks/tests matching existing `tests/hooks/` style; Markdown skills.
