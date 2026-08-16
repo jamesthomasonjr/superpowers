@@ -56,7 +56,9 @@ with that reality across harnesses that do and do not support hooks.
 | 5 | **Skill replacement:** alias *and* path override per logical id. | Supports installed alternate skills and ad-hoc project/user skill dirs. |
 | 6 | **Default when no overrides:** bundled graph = current chain as data. | Fans keep the product feel; customization is opt-in via overrides. |
 | 7 | **Transition merge:** replace-by-`from` (not append). | Avoids conflicting duplicate `(from, on)` pairs when overriding one node. |
-| 8 | **Handoffs vs triggers:** the graph models *completion handoffs* only. Situation-triggered skills (TDD while coding, systematic-debugging on bugs, verification-before-completion) stay description-driven via bootstrap unless remapped in `skills:`. | Matches how those skills already work; avoids forcing every cross-cutting concern into a linear edge. |
+| 8 | **Skills merge:** replace-by-logical-id (whole entry), not deep-merge of nested keys. | Prevents a user `skill` alias and a project `path` from combining into an invalid both-set entry; lets `{}` clear a lower-layer override back to identity. |
+| 9 | **Terminal semantics:** `to: null` = no pipeline handoff, continue the session; `to: wait` = stop and ask the human. | Preserves today’s bounded path (implement after approval) while still allowing overrides that kill the chain. |
+| 10 | **Handoffs vs triggers:** the graph models *completion handoffs* only. Situation-triggered skills (TDD while coding, systematic-debugging on bugs, verification-before-completion) stay description-driven via bootstrap unless remapped in `skills:`. | Matches how those skills already work; avoids forcing every cross-cutting concern into a linear edge. |
 
 ## Architecture
 
@@ -69,7 +71,7 @@ Config layers (merge)
             ▼ resolve + validate
   Resolved workflow artifact
     - skills registry: logical_id → { skill name | path | identity }
-    - transitions: (from, on) → to | null
+    - transitions: (from, on) → to | null | wait
     - entries: intent → start logical_id (optional remaps)
             │
      ┌──────┴──────┐
@@ -87,8 +89,13 @@ Config layers (merge)
 1. Skill bodies do not name the next skill as a directive.
 2. Skills may declare **outcomes** they can emit (stable strings).
 3. After a skill finishes, the agent selects `to` from the resolved map for
-   `(from=current logical id, on=outcome)`. `to: null` means stop and wait
-   for the human.
+   `(from=current logical id, on=outcome)`:
+   - `to: <logical id>` → invoke that skill next (via registry).
+   - `to: null` → no pipeline handoff; continue the session. Description-
+     triggered skills (TDD, etc.) still apply. This is the bounded-path
+     default after brainstorming approval.
+   - `to: wait` → stop; do not invent a next skill or start implementation;
+     ask the human what to do.
 4. Invoking a logical id uses the skills registry (path → alias → same-name).
 
 ## Config shape
@@ -136,27 +143,50 @@ transitions:
 | Field | Meaning |
 |-------|---------|
 | `version` | Schema version; v1 resolver rejects unknown major versions. |
-| `skills.<id>` | Registry entry. Empty / omitted fields → invoke skill named `<id>`. |
+| `skills.<id>` | Registry entry. Empty object `{}` → identity (invoke skill named `<id>`), and when used in an overlay **clears** any lower-layer alias/path for that id. |
 | `skills.<id>.skill` | Alias: invoke this installed skill name instead. |
 | `skills.<id>.path` | Filesystem override: read `SKILL.md` from this directory (absolute, `~` expanded, or relative to project root). Mutually exclusive with `.skill` in the same entry; if both set, validation fails. |
-| `entries` | Optional remaps for bootstrap “when this kind of work starts, prefer this logical id.” Does not replace description-based discovery; it disambiguates when multiple skills could apply. |
+| `entries` | Optional remaps for bootstrap “when this kind of work starts, prefer this logical id.” Does not replace description-based discovery; it disambiguates when multiple skills could apply. Per-key replace on overlay (flat string map). |
 | `transitions[].from` | Logical id of the skill that just finished. |
 | `transitions[].on` | Outcome string declared by that skill. |
-| `transitions[].to` | Next logical id, or `null` for terminal. |
+| `transitions[].to` | Next logical id, `null` (continue session, no pipeline handoff), or `wait` (stop for the human). |
 
 ### Merge algorithm
 
 1. Load bundled defaults.
-2. If user file exists, deep-merge `skills` and `entries`; for `transitions`,
-   **drop** any bundled/user-earlier edges whose `from` appears in the
-   overlay’s transitions, then append the overlay’s transitions for those
-   `from` values (and any new `from`s).
+2. If user file exists, apply overlays:
+   - **`skills`:** replace-by-logical-id. If the overlay defines `skills.<id>`,
+     that entire entry replaces the lower-layer entry for `<id>` (no nested
+     deep-merge of `skill`/`path`). Overlay `skills.<id>: {}` resets to
+     identity.
+   - **`entries`:** per-key replace (overlay key wins).
+   - **`transitions`:** replace-by-`from` — **drop** any earlier edges whose
+     `from` appears in the overlay’s transitions, then append the overlay’s
+     transitions for those `from` values (and any new `from`s).
 3. Repeat with project file (highest precedence).
 4. Validate the merged document.
 5. Emit resolved JSON (and optional short markdown summary for injection).
 
-Partial override files are encouraged — only list remaps and changed
-`from` nodes.
+Partial override files are encouraged — only list remapped skill ids and
+changed `from` nodes.
+
+**Example (project clears a user path override and kills the architectural handoff):**
+
+```yaml
+skills:
+  brainstorming: {}   # back to bundled identity skill
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+```
 
 ## Components
 
@@ -170,8 +200,8 @@ including at minimum:
 | from | on | to |
 |------|----|----|
 | brainstorming | approved-architectural | writing-plans |
-| brainstorming | approved-bounded | null (then normal in-session workflow; TDD etc. still trigger by description) |
-| brainstorming | approved-spike | null |
+| brainstorming | approved-bounded | null (continue session; implement via description-triggered skills such as TDD — same as today) |
+| brainstorming | approved-spike | null (continue session after reporting; no pipeline handoff) |
 | writing-plans | subagent-driven | subagent-driven-development |
 | writing-plans | inline | executing-plans |
 | subagent-driven-development | complete | finishing-a-development-branch |
@@ -205,8 +235,9 @@ hook style). Responsibilities:
   - YAML/JSON parse success
   - `version` supported
   - no duplicate `(from, on)`
-  - every non-null `to` exists as a logical id in the merged skill set
-    (identity entries implied for known bundled skills even if not listed)
+  - every `to` that is not `null` or `wait` exists as a logical id in the
+    merged skill set (identity entries implied for known bundled skills even
+    if not listed)
   - `path` targets exist and contain `SKILL.md`
   - alias targets are non-empty strings
   - `.skill` and `.path` not both set
@@ -231,7 +262,10 @@ Update `using-superpowers` with a short **Workflow map** section:
 
 - Skills are terminal; do not invent handoffs.
 - After a skill completes, read the map; use `(from, on) → to`.
-- `to: null` → stop for the human.
+- `to: <id>` → invoke that logical id next (registry-resolved).
+- `to: null` → no pipeline handoff; continue the session (description
+  triggers still apply).
+- `to: wait` → stop and ask the human; do not start the next pipeline step.
 - Resolve skill location via the registry before invoke.
 - Harnesses without injection: run the resolver (or read the cache) before
   the first skill use and again before each handoff if the map might have
@@ -278,22 +312,24 @@ When the agent (or a helper) resolves logical id `X`:
 | Invalid YAML / validation failure in SessionStart | Warn + fall back to bundled defaults; do not brick the plugin. |
 | Explicit `resolve-workflow` CLI | Non-zero exit + stderr details. |
 | Broken path / bad alias at invoke time | Report which logical id failed; do not invent a substitute. |
-| Outcome missing from map | Treat as terminal; ask the human what to do next. |
+| Outcome missing from map | Same as `to: wait` — ask the human; do not invent a next skill. |
 | Agent ignores map | Same class of failure as ignoring prose today; mitigate with bootstrap language + evals. |
 | Upstream merge conflicts | Expected on skill files that lose prose handoffs; document as intentional fork divergence. |
 
 ## Testing
 
-1. **Unit (resolver):** merge precedence; replace-by-`from`; alias + path;
-   validation failures; golden resolved JSON with empty overlays ≡ bundled
-   default chain.
+1. **Unit (resolver):** merge precedence; skills replace-by-id (user alias +
+   project path does not combine; `{}` clears); transition replace-by-`from`;
+   alias + path; `null` vs `wait`; validation failures; golden resolved JSON
+   with empty overlays ≡ bundled default chain.
 2. **Hook:** SessionStart output includes map (or fallback warning) under
    Claude-shaped and Cursor-shaped env vars (extend `tests/hooks/`).
 3. **Skill lint (light):** process skills that used to hard-require a next
    pipeline skill no longer contain forbidden handoff phrases (allowlist
    exceptions for background sub-procedures if needed).
 4. **Agent eval (follow-up):** remap brainstorming via `path`; confirm override
-   is read; set architectural `to: null`; confirm no auto writing-plans.
+   is read; set architectural `to: wait`; confirm no auto writing-plans;
+   confirm bounded `to: null` still proceeds to implementation.
 
 ## Rollout (implementation phases — not this doc’s job to plan in detail)
 
@@ -312,9 +348,10 @@ Suggested order for the later implementation plan:
 
 - With no overrides, agent behavior matches pre-change Superpowers pipeline
   (same handoff sequence for the happy path).
-- A project config can set `brainstorming` → `to: null` for
-  `approved-architectural` and the agent stops after the spec without
-  auto-invoking writing-plans.
+- A project config can set `brainstorming` / `approved-architectural` →
+  `to: wait` and the agent stops after the spec without auto-invoking
+  writing-plans; default `approved-bounded` → `to: null` still continues
+  into normal in-session implementation.
 - A user or project config can point `brainstorming.path` at an alternate
   skill directory and that content is what gets loaded for that logical id.
 - Invalid project config does not prevent SessionStart bootstrap.
