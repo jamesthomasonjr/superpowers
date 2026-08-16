@@ -262,8 +262,8 @@ for (const text of expected) {
     process.exit(1);
   }
 }
-if (context.includes("WORKFLOW_MAP")) {
-  console.error("invalid project config should not inject WORKFLOW_MAP");
+if (context.includes("RESOLVED_JSON")) {
+  console.error("invalid project config should not inject resolved workflow JSON");
   process.exit(1);
 }
 '; then
