@@ -91,8 +91,7 @@ your path and complete them in order.
 2. **Ask clarifying questions** — one at a time, the ones that matter
 3. **Present short design in chat** — approach, files touched, testing
 4. **Get approval** — STOP and wait for an explicit yes; presenting the design and starting in the same breath is skipping the gate
-5. **Emit outcome** — after approval, emit `approved-bounded` (see Outcomes)
-6. **Implement** — proceed with the normal development workflow (TDD applies); no plan document
+5. **Emit outcome** — after approval, emit `approved-bounded` and follow the workflow map (see Outcomes). Do not hardcode implementation as the next step inside this skill.
 
 **Architectural:**
 1. **Explore project context** — check files, docs, recent commits
@@ -112,7 +111,7 @@ When this skill finishes, emit exactly one outcome (workflow map selects next):
 | Path | Outcome | Meaning |
 |------|---------|---------|
 | Architectural, human approved written spec | `approved-architectural` | Design accepted; map default goes to writing-plans |
-| Bounded, human approved in-chat design | `approved-bounded` | Map default is `null` — continue session and implement |
+| Bounded, human approved in-chat design | `approved-bounded` | Map default is `null` — continue session (description-triggered skills such as TDD apply). If map says `wait`, stop. |
 | Spike, probe complete | `approved-spike` | Map default is `null` — report was the deliverable |
 
 Do not invent a next pipeline skill. Follow the resolved workflow map.
@@ -129,7 +128,6 @@ digraph brainstorming {
     "Investigate; report recommendation" [shape=box];
     "Emit outcome: approved-spike" [shape=doublecircle];
     "Emit outcome: approved-bounded" [shape=doublecircle];
-    "Implement via normal workflow (no plan doc)" [shape=box];
     "Explore project context" [shape=box];
     "Ask clarifying questions" [shape=box];
     "Propose 2-3 approaches" [shape=box];
@@ -150,7 +148,6 @@ digraph brainstorming {
     "Human approves?" -> "Investigate; report recommendation" [label="spike: yes"];
     "Investigate; report recommendation" -> "Emit outcome: approved-spike";
     "Human approves?" -> "Emit outcome: approved-bounded" [label="bounded: yes"];
-    "Emit outcome: approved-bounded" -> "Implement via normal workflow (no plan doc)";
     "Hidden complexity? Upgrade path" -> "Classify: spike / bounded / architectural";
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -165,13 +162,13 @@ digraph brainstorming {
 }
 ```
 
-**Terminal states are path-bound.** Architectural: emit
-`approved-architectural` and follow the workflow map (bundled default
-points at writing-plans) — never frontend-design, mcp-builder, or any
-other implementation skill. Bounded: after approval, emit
-`approved-bounded`, then implementation proceeds through the normal
-development workflow; no plan document. Spike: after reporting, emit
-`approved-spike`; the report was the deliverable.
+**Terminal states are path-bound.** Every path ends by emitting an outcome
+and following the workflow map — never invent the next pipeline skill.
+Architectural: emit `approved-architectural` (bundled default →
+writing-plans). Bounded: emit `approved-bounded` (bundled default `null`
+means continue the session; description-triggered skills such as TDD
+apply — if the map says `wait`, stop and ask the human). Spike: emit
+`approved-spike` after reporting (bundled default `null`).
 
 ## The Process
 
