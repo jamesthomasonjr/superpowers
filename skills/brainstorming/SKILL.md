@@ -126,8 +126,10 @@ digraph brainstorming {
     "Ask clarifying questions (bounded)" [shape=box];
     "Present short design in chat" [shape=box];
     "Human approves?" [shape=diamond];
-    "Investigate; report recommendation" [shape=doublecircle];
-    "Implement via normal workflow (no plan doc)" [shape=doublecircle];
+    "Investigate; report recommendation" [shape=box];
+    "Emit outcome: approved-spike" [shape=doublecircle];
+    "Emit outcome: approved-bounded" [shape=doublecircle];
+    "Implement via normal workflow (no plan doc)" [shape=box];
     "Explore project context" [shape=box];
     "Ask clarifying questions" [shape=box];
     "Propose 2-3 approaches" [shape=box];
@@ -146,7 +148,9 @@ digraph brainstorming {
     "Ask clarifying questions (bounded)" -> "Present short design in chat";
     "Present short design in chat" -> "Human approves?";
     "Human approves?" -> "Investigate; report recommendation" [label="spike: yes"];
-    "Human approves?" -> "Implement via normal workflow (no plan doc)" [label="bounded: yes"];
+    "Investigate; report recommendation" -> "Emit outcome: approved-spike";
+    "Human approves?" -> "Emit outcome: approved-bounded" [label="bounded: yes"];
+    "Emit outcome: approved-bounded" -> "Implement via normal workflow (no plan doc)";
     "Hidden complexity? Upgrade path" -> "Classify: spike / bounded / architectural";
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -164,10 +168,10 @@ digraph brainstorming {
 **Terminal states are path-bound.** Architectural: emit
 `approved-architectural` and follow the workflow map (bundled default
 points at writing-plans) — never frontend-design, mcp-builder, or any
-other implementation skill. Bounded: after
-approval, implementation proceeds directly through the normal
-development workflow; no plan document. Spike: the terminal state is a
-reported recommendation.
+other implementation skill. Bounded: after approval, emit
+`approved-bounded`, then implementation proceeds through the normal
+development workflow; no plan document. Spike: after reporting, emit
+`approved-spike`; the report was the deliverable.
 
 ## The Process
 

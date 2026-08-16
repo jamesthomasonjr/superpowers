@@ -45,7 +45,12 @@ def merge_workflows(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, 
         result["version"] = overlay["version"]
 
     if "skills" in overlay:
-        for skill_id, entry in overlay["skills"].items():
+        skills_overlay = overlay["skills"]
+        if not isinstance(skills_overlay, dict):
+            raise WorkflowResolveError(
+                f"overlay skills must be a mapping, got {type(skills_overlay).__name__}"
+            )
+        for skill_id, entry in skills_overlay.items():
             if entry is None:
                 result["skills"][skill_id] = {}
             elif isinstance(entry, dict):
@@ -54,7 +59,12 @@ def merge_workflows(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, 
                 result["skills"][skill_id] = entry
 
     if "entries" in overlay:
-        for key, value in overlay["entries"].items():
+        entries_overlay = overlay["entries"]
+        if not isinstance(entries_overlay, dict):
+            raise WorkflowResolveError(
+                f"overlay entries must be a mapping, got {type(entries_overlay).__name__}"
+            )
+        for key, value in entries_overlay.items():
             result["entries"][key] = value
 
     if "transitions" in overlay:
@@ -200,8 +210,11 @@ def resolve_workflow(
                 raise WorkflowResolveError(
                     f"failed to parse user workflow: {exc}"
                 ) from exc
-            if isinstance(user_doc, dict):
-                merged = merge_workflows(merged, user_doc)
+            if not isinstance(user_doc, dict):
+                raise WorkflowResolveError(
+                    f"user workflow must be a mapping, got {type(user_doc).__name__}"
+                )
+            merged = merge_workflows(merged, user_doc)
 
         project_path = project_root / ".superpowers" / "workflow.yaml"
         if project_path.is_file():
@@ -211,8 +224,11 @@ def resolve_workflow(
                 raise WorkflowResolveError(
                     f"failed to parse project workflow: {exc}"
                 ) from exc
-            if isinstance(project_doc, dict):
-                merged = merge_workflows(merged, project_doc)
+            if not isinstance(project_doc, dict):
+                raise WorkflowResolveError(
+                    f"project workflow must be a mapping, got {type(project_doc).__name__}"
+                )
+            merged = merge_workflows(merged, project_doc)
 
     bundled_skills = set(discover_known_skills(plugin_root))
     errors = validate_workflow(

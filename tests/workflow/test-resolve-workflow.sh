@@ -199,6 +199,46 @@ else
   pass "invalid config exits 1"
 fi
 
+echo "=== merge rejects null skills ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import WorkflowResolveError, merge_workflows
+
+base = {"version": 1, "skills": {}, "entries": {}, "transitions": []}
+try:
+    merge_workflows(base, {"skills": None})
+    raise SystemExit("expected WorkflowResolveError for null skills")
+except WorkflowResolveError as exc:
+    assert "skills must be a mapping" in str(exc)
+try:
+    merge_workflows(base, {"entries": ["not", "a", "map"]})
+    raise SystemExit("expected WorkflowResolveError for list entries")
+except WorkflowResolveError as exc:
+    assert "entries must be a mapping" in str(exc)
+print("ok")
+PY
+then
+  pass "merge rejects null skills"
+else
+  fail "merge rejects null skills"
+fi
+
+echo "=== CLI rejects non-mapping overlay ==="
+mkdir -p "$PROJ/.superpowers"
+printf '%s\n' '- just-a-list' > "$PROJ/.superpowers/workflow.yaml"
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-nonmap.txt"; then
+  fail "non-mapping overlay should exit 1"
+else
+  if grep -qi 'must be a mapping' "$TEST_ROOT/err-nonmap.txt"; then
+    pass "CLI rejects non-mapping overlay"
+  else
+    fail "CLI rejects non-mapping overlay"
+    sed 's/^/    /' "$TEST_ROOT/err-nonmap.txt"
+  fi
+fi
+
 echo "=== CLI bundled-only ignores invalid overlay ==="
 if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" --bundled-only)" &&
   echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["version"]==1; assert any(t["from"]=="brainstorming" and t["on"]=="approved-architectural" and t["to"]=="writing-plans" for t in d["transitions"])'; then
