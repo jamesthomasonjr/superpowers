@@ -1,14 +1,14 @@
 {
   "name": "superpowers",
-  "displayName": "Superpowers",
-  "description": "Core skills library: TDD, debugging, collaboration patterns, and proven techniques",
+  "displayName": "Supersuit",
+  "description": "Supersuit: Superpowers skills with optional configurable workflow overlays",
   "version": "6.3.0",
   "author": {
     "name": "Jesse Vincent",
     "email": "jesse@fsck.com"
   },
-  "homepage": "https://github.com/obra/superpowers",
-  "repository": "https://github.com/obra/superpowers",
+  "homepage": "https://github.com/jamesthomasonjr/superpowers",
+  "repository": "https://github.com/jamesthomasonjr/superpowers",
   "license": "MIT",
   "keywords": [
     "skills",

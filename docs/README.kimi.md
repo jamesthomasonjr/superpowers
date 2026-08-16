@@ -1,30 +1,22 @@
-# Superpowers for Kimi Code
+# Supersuit for Kimi Code
 
-Complete guide for using Superpowers with [Kimi Code](https://github.com/MoonshotAI/kimi-code).
+Complete guide for using **Supersuit** (configurable Superpowers fork) with [Kimi Code](https://github.com/MoonshotAI/kimi-code).
 
 ## Installation
 
-Superpowers is available in Kimi Code's plugin marketplace.
-
-Open the plugin manager:
+Install from this repository:
 
 ```text
-/plugins
+/plugins install https://github.com/jamesthomasonjr/superpowers
 ```
 
-Go to `Marketplace` > `Superpowers` and install it.
-
-You can also install from this repository:
+For a specific branch:
 
 ```text
-/plugins install https://github.com/obra/superpowers
+/plugins install https://github.com/jamesthomasonjr/superpowers/tree/cursor/modular-functionality-aa6a
 ```
 
-For unreleased validation against `dev`, pin the branch explicitly:
-
-```text
-/plugins install https://github.com/obra/superpowers/tree/dev
-```
+Kimi Code's marketplace entry named "Superpowers" may point at upstream. Prefer the GitHub URL above for Supersuit.
 
 Kimi Code applies plugin changes to new sessions. After installing, updating, enabling, disabling, or reloading a plugin, start a fresh session with `/new`.
 
@@ -38,7 +30,7 @@ The manifest does three things:
 2. Loads `using-superpowers` at session start through `sessionStart.skill`.
 3. Provides Kimi-specific tool mapping through `skillInstructions`.
 
-Kimi Code reads Superpowers skills from this repository. There are no copied skills, symlinks, hooks, or extra runtime dependencies.
+Kimi Code reads skills from this repository. There are no copied skills, symlinks, hooks, or extra runtime dependencies. Pipeline handoffs use Supersuit's workflow map; paths remain under `.superpowers/`. See [workflow-config.md](workflow-config.md).
 
 ## Tool Mapping
 
@@ -63,7 +55,7 @@ Use Kimi Code's plugin manager:
 /plugins
 ```
 
-Select Superpowers and update it from there. Start a fresh session with `/new` after updating.
+Select the installed plugin and update it from there, or reinstall from the GitHub URL. Start a fresh session with `/new` after updating.
 
 ## Troubleshooting
 
@@ -75,10 +67,10 @@ Select Superpowers and update it from there. Start a fresh session with `/new` a
 
 ### Direct GitHub install used an old release
 
-Kimi Code installs the latest GitHub release for a bare repository URL when one exists. To test unreleased changes before the next Superpowers release, install the branch explicitly:
+Kimi Code installs the latest GitHub release for a bare repository URL when one exists. To test unreleased fork work, install the branch explicitly:
 
 ```text
-/plugins install https://github.com/obra/superpowers/tree/dev
+/plugins install https://github.com/jamesthomasonjr/superpowers/tree/cursor/modular-functionality-aa6a
 ```
 
 ### Skills not triggering

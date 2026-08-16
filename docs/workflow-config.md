@@ -1,6 +1,8 @@
 # Workflow configuration
 
-Superpowers routes pipeline handoffs through a **resolved workflow map** instead of hard-coded skill directives. Skills emit stable **outcomes**; the map selects the next step (`to`).
+**Supersuit** routes pipeline handoffs through a **resolved workflow map** instead of hard-coded skill directives. Skills emit stable **outcomes**; the map selects the next step (`to`). With no overlays, the bundled map matches the Superpowers pipeline.
+
+Paths stay under `.superpowers/` / `~/.superpowers/` so stock installs and docs remain familiar.
 
 **Design spec:** [docs/superpowers/specs/2026-08-16-configurable-workflow-graph-design.md](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
 

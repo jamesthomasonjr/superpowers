@@ -1,11 +1,16 @@
-# Superpowers
+# Supersuit
 
-Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.
+**Supersuit** is a fork of [Superpowers](https://github.com/obra/superpowers): the same composable skills and coding-agent workflow, with an optional **configurable workflow graph** so you can rewire handoffs or replace individual skills without forking skill prose.
+
+With no overrides, behavior matches Superpowers. Add a user or project workflow file only when you want something different.
+
+> **Name note:** Unrelated to Farama Foundation’s deprecated RL library also called SuperSuit. This project is for coding-agent skills and workflows.
 
 ## Table of Contents
 
+- [What is Supersuit?](#what-is-supersuit)
+- [Relationship to Superpowers](#relationship-to-superpowers)
 - [How it works](#how-it-works)
-- [Commercial Services](#commercial-services)
 - [Getting Started](#installation)
   - [Claude Code](#claude-code)
   - [Antigravity](#antigravity)
@@ -22,7 +27,8 @@ Superpowers is a complete software development methodology for your coding agent
   - [Pi](#pi)
   - [Hermes Agent](#hermes-agent)
 - [The Basic Workflow](#the-basic-workflow)
-- [Community](#community)
+- [Customizing the workflow](#customizing-the-workflow)
+- [Upstream & community](#upstream--community)
 - [What's Inside](#whats-inside)
 - [Philosophy](#philosophy)
 - [Contributing](#contributing)
@@ -30,107 +36,87 @@ Superpowers is a complete software development methodology for your coding agent
 - [License](#license)
 - [Visual companion telemetry](#visual-companion-telemetry)
 
+## What is Supersuit?
+
+Supersuit keeps Superpowers’ methodology — brainstorm before coding, plan in detail, TDD, systematic debugging, subagent-driven execution, finish the branch — and makes the **pipeline** data-driven:
+
+- Skills emit stable **outcomes** instead of hard-coding the next skill.
+- A **workflow map** decides what runs next (`to: <skill>`, `null`, or `wait`).
+- You can **alias or path-override** individual skills by logical id.
+- Config layers: bundled defaults → `~/.superpowers/workflow.yaml` → `.superpowers/workflow.yaml`.
+
+Filesystem and skill ids stay on the Superpowers contract (directories named `.superpowers/`, bootstrap skill `using-superpowers`, and so on) so defaults and muscle memory transfer cleanly.
+
+## Relationship to Superpowers
+
+| | Superpowers (`obra/superpowers`) | Supersuit (this fork) |
+|--|----------------------------------|------------------------|
+| Skills & methodology | Opinionated, proven chain | Same by default |
+| Pipeline handoffs | Encoded in skill prose | Resolved workflow map |
+| Rewire / replace skills | Edit skill files | Optional YAML overlays |
+| Upstream fit | Core product | Fork-specific; may not match maintainer vision |
+
+Contributing the configurable graph **upstream is preferred** when it fits. This fork exists because workflow customization is explicitly outside Superpowers’ acceptance criteria today. See the [design spec](docs/superpowers/specs/2026-08-16-configurable-workflow-graph-design.md).
+
 ## How it works
 
-It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it *doesn't* just jump into trying to write code. Instead, it steps back and asks you what you're really trying to do. 
+It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it *doesn't* just jump into trying to write code. Instead, it steps back and asks you what you're really trying to do.
 
-Once it's teased a spec out of the conversation, it shows it to you in chunks short enough to actually read and digest. 
+Once it's teased a spec out of the conversation, it shows it to you in chunks short enough to actually read and digest.
 
-After you've signed off on the design, your agent puts together an implementation plan that's clear enough for an enthusiastic junior engineer with poor taste, no judgement, no project context, and an aversion to testing to follow. It emphasizes true red/green TDD, YAGNI (You Aren't Gonna Need It), and DRY. 
+After you've signed off on the design, your agent puts together an implementation plan that's clear enough for an enthusiastic junior engineer with poor taste, no judgement, no project context, and an aversion to testing to follow. It emphasizes true red/green TDD, YAGNI (You Aren't Gonna Need It), and DRY.
 
 Next up, once you say "go", it launches a *subagent-driven-development* process, having agents work through each engineering task, inspecting and reviewing their work, and continuing forward. It's not uncommon for your agent to work autonomously for a couple hours at a time without deviating from the plan you put together.
 
-There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent just has Superpowers.
-
-## Commercial Services
-
-If you're using Superpowers in enterprise and could benefit from commercial support, additional tooling, or managed spending, please don't hesitate to drop us a line at sales@primeradiant.com.
+There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent just has Supersuit — wearing Superpowers by default.
 
 ## Installation
 
-Installation differs by harness. If you use more than one, install Superpowers separately for each one.
+Installation differs by harness. If you use more than one, install Supersuit separately for each one.
+
+Official marketplaces often still ship **upstream** Superpowers. To get **this** fork (configurable workflow map), install from this repository as shown below.
 
 ### Claude Code
 
-Superpowers is available via the [official Claude plugin marketplace](https://claude.com/plugins/superpowers)
+Install from this repository (not the official marketplace plugin, which is upstream Superpowers):
 
-#### Official Marketplace
+```bash
+# From a local clone, or register this fork as a marketplace / plugin source
+# per your Claude Code plugin workflow, pointing at:
+#   https://github.com/jamesthomasonjr/superpowers
+```
 
-- Install the plugin from Anthropic's official marketplace:
-
-  ```bash
-  /plugin install superpowers@claude-plugins-official
-  ```
-
-#### Superpowers Marketplace
-
-The Superpowers marketplace provides Superpowers and some other related plugins for Claude Code.
-
-- Register the marketplace:
-
-  ```bash
-  /plugin marketplace add obra/superpowers-marketplace
-  ```
-
-- Install the plugin from this marketplace:
-
-  ```bash
-  /plugin install superpowers@superpowers-marketplace
-  ```
+If you only need stock Superpowers without workflow overlays, you can still use the [official Claude plugin marketplace](https://claude.com/plugins/superpowers) or `obra/superpowers-marketplace`.
 
 ### Antigravity
 
-Install Superpowers as a plugin from this repository:
+Install Supersuit as a plugin from this repository:
 
 ```bash
-agy plugin install https://github.com/obra/superpowers
+agy plugin install https://github.com/jamesthomasonjr/superpowers
 ```
 
-Antigravity runs the plugin's session-start hook, so Superpowers is active from
+Antigravity runs the plugin's session-start hook, so Supersuit is active from
 the first message. Reinstall with the same command to update.
 
 ### Codex App
 
-Superpowers is available via the [official Codex plugin marketplace](https://github.com/openai/plugins).
-
-- In the Codex app, click on Plugins in the sidebar.
-- You should see `Superpowers` in the Coding section.
-- Click the `+` next to Superpowers and follow the prompts.
+Official Codex marketplace listings may install upstream Superpowers. For Supersuit, install or point the plugin at this repository: [https://github.com/jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers).
 
 ### Codex CLI
 
-Superpowers is available via the [official Codex plugin marketplace](https://github.com/openai/plugins).
-
-- Open the plugin search interface:
-
-  ```bash
-  /plugins
-  ```
-
-- Search for Superpowers:
-
-  ```bash
-  superpowers
-  ```
-
-- Select `Install Plugin`.
+Same as Codex App: use this repository when you want Supersuit’s workflow map. Searching marketplace `superpowers` alone may resolve to upstream.
 
 ### Cursor
 
-- In Cursor Agent chat, install from marketplace:
-
-  ```text
-  /add-plugin superpowers
-  ```
-
-- Or search for "superpowers" in the plugin marketplace.
+Install from this repository (for example via a git-based or local plugin install pointing at [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers)). Marketplace `/add-plugin superpowers` may install upstream Superpowers instead of this fork.
 
 ### Devin CLI
 
 - Install the plugin from this repository:
 
   ```bash
-  devin plugins install obra/superpowers
+  devin plugins install jamesthomasonjr/superpowers
   ```
 
 - Update to the latest version with:
@@ -144,7 +130,7 @@ Superpowers is available via the [official Codex plugin marketplace](https://git
 - Register the marketplace:
 
   ```bash
-  droid plugin marketplace add https://github.com/obra/superpowers
+  droid plugin marketplace add https://github.com/jamesthomasonjr/superpowers
   ```
 
 - Install the plugin:
@@ -158,7 +144,7 @@ Superpowers is available via the [official Codex plugin marketplace](https://git
 - Install the extension:
 
   ```bash
-  gemini extensions install https://github.com/obra/superpowers
+  gemini extensions install https://github.com/jamesthomasonjr/superpowers
   ```
 
 - Update later:
@@ -169,73 +155,49 @@ Superpowers is available via the [official Codex plugin marketplace](https://git
 
 ### GitHub Copilot CLI
 
-- Register the marketplace:
-
-  ```bash
-  copilot plugin marketplace add obra/superpowers-marketplace
-  ```
-
-- Install the plugin:
-
-  ```bash
-  copilot plugin install superpowers@superpowers-marketplace
-  ```
+Install from this repository / a marketplace entry that points at [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers). The `obra/superpowers-marketplace` entry is upstream Superpowers.
 
 ### Grok Build CLI
 
-Superpowers is available via the [official Grok plugin marketplace](https://github.com/xai-org/plugin-marketplace).
-
-- Install the plugin from xAI's official marketplace:
-
-  ```bash
-  grok plugin install superpowers@xai-official --trust
-  ```
-
-- Or open the marketplace in the TUI, search for Superpowers, and install it:
-
-  ```text
-  /marketplace
-  ```
+Official Grok marketplace `superpowers` is likely upstream. For Supersuit, install from [this repository](https://github.com/jamesthomasonjr/superpowers) when your harness supports a git URL.
 
 ### Kimi Code
 
-Superpowers is available in Kimi Code's plugin marketplace.
-
-- Open Kimi Code's plugin manager:
+- Install directly from this repository:
 
   ```text
-  /plugins
-  ```
-
-- Go to `Marketplace` > `Superpowers` and install it.
-
-- Or install directly from this repository:
-
-  ```text
-  /plugins install https://github.com/obra/superpowers
+  /plugins install https://github.com/jamesthomasonjr/superpowers
   ```
 
 - Detailed docs: [docs/README.kimi.md](docs/README.kimi.md)
 
 ### OpenCode
 
-OpenCode uses its own plugin install; install Superpowers separately even if you
-already use it in another harness.
+OpenCode uses its own plugin install; install Supersuit separately even if you
+already use Superpowers in another harness.
 
 - Tell OpenCode:
 
   ```
-  Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.opencode/INSTALL.md
+  Fetch and follow instructions from https://raw.githubusercontent.com/jamesthomasonjr/superpowers/refs/heads/main/.opencode/INSTALL.md
+  ```
+
+- Or add to `opencode.json`:
+
+  ```json
+  {
+    "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git"]
+  }
   ```
 
 - Detailed docs: [docs/README.opencode.md](docs/README.opencode.md)
 
 ### Pi
 
-Install Superpowers as a Pi package from this repository:
+Install Supersuit as a Pi package from this repository:
 
 ```bash
-pi install git:github.com/obra/superpowers
+pi install git:github.com/jamesthomasonjr/superpowers
 ```
 
 For local development, run Pi with this checkout loaded as a temporary package:
@@ -244,14 +206,14 @@ For local development, run Pi with this checkout loaded as a temporary package:
 pi -e /path/to/superpowers
 ```
 
-The Pi package loads the Superpowers skills and a small extension that injects the `using-superpowers` bootstrap at session startup and again after compaction. Pi has native skills, so no compatibility `Skill` tool is required. Subagent and task-list tools remain optional Pi companion packages.
+The Pi package loads the skills and a small extension that injects the `using-superpowers` bootstrap at session startup and again after compaction. Pi has native skills, so no compatibility `Skill` tool is required. Subagent and task-list tools remain optional Pi companion packages.
 
 ### Hermes Agent
 
-Install Superpowers as a Hermes plugin from this repository:
+Install Supersuit as a Hermes plugin from this repository:
 
 ```bash
-hermes plugins install obra/superpowers --enable
+hermes plugins install jamesthomasonjr/superpowers --enable
 ```
 
 Restart any active Hermes sessions after installing. Note: Hermes has no
@@ -274,15 +236,33 @@ turn loses the bootstrap — start a fresh session if skills stop triggering.
 
 7. **finishing-a-development-branch** - Activates when tasks complete. Verifies tests, presents options (merge/PR/keep/discard), cleans up worktree.
 
-**The agent checks for relevant skills before any task.** Mandatory workflows, not suggestions.
+**The agent checks for relevant skills before any task.** Mandatory workflows, not suggestions. Pipeline continuations follow the resolved workflow map (see below).
 
-## Community
+## Customizing the workflow
 
-Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of the folks at [Prime Radiant](https://primeradiant.com).
+No config required for stock Superpowers behavior.
 
-- **Discord**: [Join us](https://discord.gg/35wsABTejz) for community support, questions, and sharing what you're building with Superpowers
-- **Issues**: https://github.com/obra/superpowers/issues
-- **Release announcements**: [Sign up](https://primeradiant.com/superpowers/) to get notified about new versions
+To rewire handoffs or replace a skill, add:
+
+- User defaults: `~/.superpowers/workflow.yaml`
+- Per-project: `.superpowers/workflow.yaml`
+
+Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
+
+Inspect the merged map:
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME" --pretty
+```
+
+## Upstream & community
+
+Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) and [Prime Radiant](https://primeradiant.com).
+
+- **This fork (issues & PRs):** https://github.com/jamesthomasonjr/superpowers
+- **Upstream Superpowers:** https://github.com/obra/superpowers
+- **Upstream Discord:** [Join](https://discord.gg/35wsABTejz) for Superpowers community support
+- **Upstream commercial support:** sales@primeradiant.com (Prime Radiant / Superpowers — not this fork)
 
 ## What's Inside
 
@@ -295,7 +275,7 @@ Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of t
 - **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, defense-in-depth, condition-based-waiting techniques)
 - **verification-before-completion** - Ensure it's actually fixed
 
-**Collaboration** 
+**Collaboration**
 - **brainstorming** - Socratic design refinement
 - **writing-plans** - Detailed implementation plans
 - **executing-plans** - Batch execution with checkpoints
@@ -308,7 +288,11 @@ Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of t
 
 **Meta**
 - **writing-skills** - Create new skills following best practices (includes testing methodology)
-- **using-superpowers** - Introduction to the skills system
+- **using-superpowers** - Introduction to the skills system and workflow map rules
+
+**Workflow**
+- **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
+- **`scripts/resolve-workflow`** - Merge and validate overlays
 
 ## Philosophy
 
@@ -316,31 +300,32 @@ Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of t
 - **Systematic over ad-hoc** - Process over guessing
 - **Complexity reduction** - Simplicity as primary goal
 - **Evidence over claims** - Verify before declaring success
+- **Defaults first, overrides optional** - Stock chain unless you configure otherwise
 
-Read [the original release announcement](https://blog.fsck.com/2025/10/09/superpowers/).
+Read [the original Superpowers release announcement](https://blog.fsck.com/2025/10/09/superpowers/).
 
 ## Contributing
 
-The general contribution process for Superpowers is below. Keep in mind that we don't generally accept contributions of new skills and that any updates to skills must work across all of the coding agents we support.
+This is a fork. Prefer proposing compatible improvements upstream to [obra/superpowers](https://github.com/obra/superpowers) when they fit core. Fork-specific work (workflow graph, Supersuit docs) lands here.
 
-1. Fork the repository
-2. Switch to the 'dev' branch
-3. Create a branch for your work
-4. Follow the `writing-skills` skill for creating and testing new and modified skills
-5. Submit a PR, being sure to fill in the pull request template.
+1. Fork or branch from this repository
+2. Prefer the branch that carries active fork work (see open PRs / `cursor/modular-functionality-*`)
+3. Create a branch for your change
+4. Follow `writing-skills` for skill content changes; keep behavior-shaping edits evidence-backed
+5. Open a PR against this fork and describe whether the change is fork-specific or a candidate for upstream
 
-Skill-behavior tests use the drill eval harness from [superpowers-evals](https://github.com/prime-radiant-inc/superpowers-evals/), cloned into `evals/` — see `evals/README.md` for setup. Plugin-infrastructure tests live at `tests/` and run via the relevant `run-*.sh` or `npm test`.
+Plugin-infrastructure tests live at `tests/`. Skill-behavior evals for upstream Superpowers use [superpowers-evals](https://github.com/prime-radiant-inc/superpowers-evals/).
 
-See `skills/writing-skills/SKILL.md` for the complete guide.
+See `skills/writing-skills/SKILL.md` for the complete skills guide.
 
 ## Updating
 
-Superpowers updates are somewhat coding-agent dependent, but are often automatic.
+Updates are harness-dependent. For git installs, pull or reinstall from [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers).
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details (same as upstream Superpowers).
 
 ## Visual companion telemetry
 
-Because skills and plugins don't provide any feedback to creators, we have no idea how many of you are using Superpowers. By default, the Prime Radiant logo on brainstorming's optional visual companion feature is loaded from our website. It includes the version of Superpowers in use. It does not include any details about your project, prompt, or coding agent. We don't see your clicks or anything about what you're building. This helps us have a rough idea of how many folks are using Superpowers and which version of Superpowers they're using. It's 100% optional. To disable this, set the environment variable `SUPERPOWERS_DISABLE_TELEMETRY` to any true value. Superpowers also honors Claude Code's `DISABLE_TELEMETRY` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` opt-outs.
+Because skills and plugins don't provide any feedback to creators, upstream Superpowers includes optional visual-companion logo telemetry from Prime Radiant. By default, the Prime Radiant logo on brainstorming's optional visual companion feature is loaded from their website. It includes the version of the plugin in use. It does not include any details about your project, prompt, or coding agent. It's 100% optional. To disable this, set the environment variable `SUPERPOWERS_DISABLE_TELEMETRY` to any true value. The plugin also honors Claude Code's `DISABLE_TELEMETRY` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` opt-outs.

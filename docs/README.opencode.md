@@ -1,28 +1,30 @@
-# Superpowers for OpenCode
+# Supersuit for OpenCode
 
-Complete guide for using Superpowers with [OpenCode.ai](https://opencode.ai).
+Complete guide for using **Supersuit** (configurable Superpowers fork) with [OpenCode.ai](https://opencode.ai).
 
 ## Installation
 
-Add superpowers to the `plugin` array in your `opencode.json` (global or project-level):
+Add this repository to the `plugin` array in your `opencode.json` (global or project-level):
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
+  "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git"]
 }
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
-registers all skills.
+registers all skills. The npm/package id remains `superpowers` for compatibility;
+the product is Supersuit.
 
-Verify by asking: "Tell me about your superpowers"
+Verify by asking: "Tell me about your superpowers" or checking that workflow-map
+bootstrap context is present after session start.
 
 OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
-another harness, install Superpowers separately for each one.
+another harness, install Supersuit separately for each one.
 
 ### Migrating from the old symlink-based install
 
-If you previously installed superpowers using `git clone` and symlinks, remove the old setup:
+If you previously installed via `git clone` and symlinks, remove the old setup:
 
 ```bash
 # Remove old symlinks
@@ -39,68 +41,22 @@ Then follow the installation steps above.
 
 ## Usage
 
-### Finding Skills
-
-Use OpenCode's native `skill` tool to list all available skills:
+Use OpenCode's native `skill` tool:
 
 ```
 use skill tool to list skills
-```
-
-### Loading a Skill
-
-```
 use skill tool to load brainstorming
 ```
 
-### Personal Skills
-
-Create your own skills in `~/.config/opencode/skills/`:
-
-```bash
-mkdir -p ~/.config/opencode/skills/my-skill
-```
-
-Create `~/.config/opencode/skills/my-skill/SKILL.md`:
-
-```markdown
----
-name: my-skill
-description: Use when [condition] - [what it does]
----
-
-# My Skill
-
-[Your skill content here]
-```
-
-### Project Skills
-
-Create project-specific skills in `.opencode/skills/` within your project.
-
-**Skill Priority:** Project skills > Personal skills > Superpowers skills
-
-## Updating
-
-OpenCode installs Superpowers through a git-backed package spec. Some OpenCode
-and Bun versions pin that resolved git dependency in a lockfile or cache, so a
-restart may not pick up the newest Superpowers commit. If updates do not appear,
-clear OpenCode's package cache or reinstall the plugin.
-
-To pin a specific version, use a branch or tag:
-
-```json
-{
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git#v5.0.3"]
-}
-```
+Stock behavior matches Superpowers. To rewire the pipeline, see
+[workflow-config.md](workflow-config.md).
 
 ## How It Works
 
-The plugin does two things:
+The OpenCode plugin:
 
-1. **Injects bootstrap context** via the `experimental.chat.messages.transform` hook, adding superpowers awareness to every conversation.
-2. **Registers the skills directory** via the `config` hook, so OpenCode discovers all superpowers skills without symlinks or manual config.
+1. **Injects bootstrap context** via the `experimental.chat.messages.transform` hook, including Supersuit/Superpowers awareness and the resolved workflow map when SessionStart/resolver support applies.
+2. **Registers the skills directory** via the `config` hook, so OpenCode discovers all skills without symlinks or manual config.
 
 ### Tool Mapping
 
@@ -134,7 +90,7 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install superpowers@git+https://github.com/obra/superpowers.git --prefix "$HOME\.config\opencode"
+npm install superpowers@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
@@ -158,6 +114,7 @@ Then use the installed package path in `opencode.json`:
 
 ## Getting Help
 
-- Report issues: https://github.com/obra/superpowers/issues
-- Main documentation: https://github.com/obra/superpowers
+- Report issues: https://github.com/jamesthomasonjr/superpowers/issues
+- Main documentation: https://github.com/jamesthomasonjr/superpowers
+- Upstream Superpowers: https://github.com/obra/superpowers
 - OpenCode docs: https://opencode.ai/docs/

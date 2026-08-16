@@ -1,6 +1,9 @@
 # Configurable Workflow Graph — Design Spec
 
-**Status:** Draft for human review (brainstormed 2026-08-16).
+**Status:** Implemented on this fork (brainstormed 2026-08-16).
+**Product name:** **Supersuit** — fork of Superpowers with a configurable
+workflow graph; filesystem contract remains `.superpowers/` and related
+Superpowers paths/ids.
 **Scope:** This fork (`jamesthomasonjr/superpowers`). Not proposed for upstream
 `obra/superpowers` core without a separate upstream conversation — upstream
 treats the opinionated chain as product, and fork-specific workflow
