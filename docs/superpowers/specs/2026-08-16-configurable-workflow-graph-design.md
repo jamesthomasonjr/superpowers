@@ -2,8 +2,10 @@
 
 **Status:** Implemented on this fork (brainstormed 2026-08-16).
 **Product name:** **Supersuit** — fork of Superpowers with a configurable
-workflow graph; filesystem contract remains `.superpowers/` and related
-Superpowers paths/ids.
+workflow graph. Plugin/package id is `supersuit` (not `superpowers`). Config
+filesystem contract remains `.superpowers/` and related Superpowers paths;
+bootstrap skill folder remains `using-superpowers` (invoked as
+`supersuit:using-superpowers`).
 **Scope:** This fork (`jamesthomasonjr/superpowers`). Not proposed for upstream
 `obra/superpowers` core without a separate upstream conversation — upstream
 treats the opinionated chain as product, and fork-specific workflow

@@ -1,11 +1,11 @@
 {
-  "name": "superpowers",
+  "name": "supersuit",
   "version": "6.3.0",
-  "description": "Supersuit: Superpowers skills with optional configurable workflow overlays — planning, TDD, debugging, and collaboration.",
+  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
   "author": {
-    "name": "Jesse Vincent",
-    "email": "jesse@fsck.com",
-    "url": "https://github.com/obra"
+    "name": "James Thomason Jr.",
+    "email": "github@jamesthomasonjr.com",
+    "url": "https://github.com/jamesthomasonjr"
   },
   "homepage": "https://github.com/jamesthomasonjr/superpowers",
   "repository": "https://github.com/jamesthomasonjr/superpowers",
@@ -25,8 +25,8 @@
   "interface": {
     "displayName": "Supersuit",
     "shortDescription": "Configurable Superpowers workflows for coding agents",
-    "longDescription": "Supersuit defaults to Superpowers (brainstorming, planning, TDD, debugging, review, finish-the-branch) and adds optional workflow-map overlays to rewire or replace skills.",
-    "developerName": "Jesse Vincent",
+    "longDescription": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers. Install this plugin instead of upstream Superpowers \u2014 do not enable both.",
+    "developerName": "James Thomason Jr.",
     "category": "Developer Tools",
     "capabilities": [
       "Interactive",

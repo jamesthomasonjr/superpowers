@@ -9,6 +9,7 @@ With no overrides, behavior matches Superpowers. Add a user or project workflow 
 ## Table of Contents
 
 - [What is Supersuit?](#what-is-supersuit)
+- [Identity model (what changes vs what stays)](#identity-model-what-changes-vs-what-stays)
 - [Relationship to Superpowers](#relationship-to-superpowers)
 - [How it works](#how-it-works)
 - [Getting Started](#installation)
@@ -45,12 +46,27 @@ Supersuit keeps Superpowers’ methodology — brainstorm before coding, plan in
 - You can **alias or path-override** individual skills by logical id.
 - Config layers: bundled defaults → `~/.superpowers/workflow.yaml` → `.superpowers/workflow.yaml`.
 
-Filesystem and skill ids stay on the Superpowers contract (directories named `.superpowers/`, bootstrap skill `using-superpowers`, and so on) so defaults and muscle memory transfer cleanly.
+## Identity model (what changes vs what stays)
+
+Keeping the install id as `superpowers` while shipping a fork is confusing for users and awkward toward upstream. Supersuit uses a **split identity**:
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Plugin / package id | **`supersuit`** | Distinct install; can sit beside docs about Superpowers without impersonating the upstream plugin |
+| Author / maintainer | **This fork’s maintainer** | Upstream author credited in descriptions; manifests must not claim to be Jesse Vincent / obra |
+| Display name | **Supersuit** | What humans see in marketplaces |
+| Skill namespace | **`supersuit:<skill>`** | Matches plugin id (e.g. `supersuit:brainstorming`) |
+| Bootstrap skill folder | `using-superpowers` | Still teaches the Superpowers methodology; invoked as `supersuit:using-superpowers` |
+| Config dirs | **`.superpowers/`** / `~/.superpowers/` | Workflow overlays stay compatible with the design already documented; no forced migration |
+| Env telemetry flag | `SUPERPOWERS_DISABLE_TELEMETRY` | Inherited from upstream skill code for now |
+
+**Do not enable upstream Superpowers and Supersuit in the same harness profile.** They overlap in skills and will fight over triggers.
 
 ## Relationship to Superpowers
 
 | | Superpowers (`obra/superpowers`) | Supersuit (this fork) |
 |--|----------------------------------|------------------------|
+| Plugin id | `superpowers` | `supersuit` |
 | Skills & methodology | Opinionated, proven chain | Same by default |
 | Pipeline handoffs | Encoded in skill prose | Resolved workflow map |
 | Rewire / replace skills | Edit skill files | Optional YAML overlays |
@@ -136,7 +152,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Install the plugin:
 
   ```bash
-  droid plugin install superpowers@superpowers
+  droid plugin install supersuit@supersuit
   ```
 
 ### Gemini CLI
@@ -186,7 +202,7 @@ already use Superpowers in another harness.
 
   ```json
   {
-    "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git"]
+    "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
   }
   ```
 

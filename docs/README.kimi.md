@@ -61,7 +61,7 @@ Select the installed plugin and update it from there, or reinstall from the GitH
 
 ### Plugin not loading
 
-1. Run `/plugins info superpowers` and check diagnostics.
+1. Run `/plugins info supersuit` and check diagnostics.
 2. Make sure the plugin is enabled.
 3. Start a fresh session with `/new` after install or update.
 
@@ -75,6 +75,6 @@ Kimi Code installs the latest GitHub release for a bare repository URL when one 
 
 ### Skills not triggering
 
-1. Confirm `/plugins info superpowers` shows the plugin enabled.
+1. Confirm `/plugins info supersuit` shows the plugin enabled.
 2. Start a fresh session with `/new`.
 3. Try the acceptance prompt: `Let's make a react todo list`. A working install should load `brainstorming` before writing code.

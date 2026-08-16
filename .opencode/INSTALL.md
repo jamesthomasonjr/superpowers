@@ -7,21 +7,23 @@
 ## Installation
 
 Add this fork to the `plugin` array in your `opencode.json` (global or project-level).
-The package id remains `superpowers` for compatibility; the product is **Supersuit**.
+The package id is **`supersuit`**.
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git"]
+  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
 }
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
 registers all skills.
 
-Verify by asking: "Tell me about your superpowers"
+Verify by asking: "Tell me about your skills" or checking that workflow-map
+bootstrap context is present after session start.
 
 OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
-another harness, install Supersuit separately for each one.
+another harness, install Supersuit separately for each one. Do not enable
+upstream Superpowers in the same profile.
 
 ## Migrating from the old symlink-based install
 
@@ -63,7 +65,7 @@ To pin a specific ref:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git#cursor/modular-functionality-aa6a"]
+  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git#cursor/modular-functionality-aa6a"]
 }
 ```
 
@@ -71,7 +73,7 @@ To pin a specific ref:
 
 ### Plugin not loading
 
-1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -i superpowers`
+1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -iE 'supersuit|superpowers'`
 2. Verify the plugin line in your `opencode.json`
 3. Make sure you're running a recent version of OpenCode
 
@@ -84,14 +86,14 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install superpowers@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
+npm install supersuit@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
 
 ```json
 {
-  "plugin": ["~/.config/opencode/node_modules/superpowers"]
+  "plugin": ["~/.config/opencode/node_modules/supersuit"]
 }
 ```
 

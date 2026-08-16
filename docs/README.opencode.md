@@ -8,13 +8,12 @@ Add this repository to the `plugin` array in your `opencode.json` (global or pro
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/jamesthomasonjr/superpowers.git"]
+  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
 }
 ```
 
 Restart OpenCode. The plugin installs through OpenCode's plugin manager and
-registers all skills. The npm/package id remains `superpowers` for compatibility;
-the product is Supersuit.
+registers all skills. The package id is **`supersuit`** (not upstream `superpowers`).
 
 Verify by asking: "Tell me about your superpowers" or checking that workflow-map
 bootstrap context is present after session start.
@@ -90,14 +89,14 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install superpowers@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
+npm install supersuit@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
 
 ```json
 {
-  "plugin": ["~/.config/opencode/node_modules/superpowers"]
+  "plugin": ["~/.config/opencode/node_modules/supersuit"]
 }
 ```
 

@@ -1,19 +1,19 @@
 {
-  "name": "superpowers-dev",
-  "description": "Development marketplace for Supersuit (Superpowers fork with configurable workflows)",
+  "name": "supersuit-dev",
+  "description": "Development marketplace for Supersuit",
   "owner": {
-    "name": "Jesse Vincent",
-    "email": "jesse@fsck.com"
+    "name": "James Thomason Jr.",
+    "email": "github@jamesthomasonjr.com"
   },
   "plugins": [
     {
-      "name": "superpowers",
-      "description": "Supersuit: Superpowers skills for Claude Code with optional configurable workflow overlays",
+      "name": "supersuit",
+      "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
       "version": "6.3.0",
       "source": "./",
       "author": {
-        "name": "Jesse Vincent",
-        "email": "jesse@fsck.com"
+        "name": "James Thomason Jr.",
+        "email": "github@jamesthomasonjr.com"
       }
     }
   ]

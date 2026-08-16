@@ -1,10 +1,10 @@
 {
-  "name": "superpowers",
-  "description": "Supersuit: Superpowers skills for Claude Code with optional configurable workflow overlays",
+  "name": "supersuit",
+  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
   "version": "6.3.0",
   "author": {
-    "name": "Jesse Vincent",
-    "email": "jesse@fsck.com"
+    "name": "James Thomason Jr.",
+    "email": "github@jamesthomasonjr.com"
   },
   "homepage": "https://github.com/jamesthomasonjr/superpowers",
   "repository": "https://github.com/jamesthomasonjr/superpowers",
