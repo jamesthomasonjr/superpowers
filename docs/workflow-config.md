@@ -94,7 +94,7 @@ Notes:
 ./scripts/run-workflow-action --id ensure-worktree --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME"
 ```
 
-The command prints JSON including `outcome` and `exit_code`. Use `outcome` as the map's `on` for the next handoff.
+The command prints JSON including `outcome` and `exit_code` on **stdout**. Child script stdout/stderr are forwarded to the CLI's stderr so the JSON stays parseable. Use `outcome` as the map's `on` for the next handoff.
 
 ## Example: replace brainstorming with a custom skill path
 

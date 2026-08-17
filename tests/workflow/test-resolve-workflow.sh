@@ -522,6 +522,39 @@ else
   fi
 fi
 
+echo "=== run-workflow-action keeps JSON clean with noisy child ==="
+cat > "$PROJ/scripts/noisy-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "progress: starting"
+echo "warning: chatter" >&2
+exit 0
+EOF
+chmod +x "$PROJ/scripts/noisy-fixture.sh"
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  noisy-fixture:
+    run:
+      argv:
+        - scripts/noisy-fixture.sh
+      allow:
+        - project
+EOF
+set +e
+OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/run-workflow-action" --id noisy-fixture --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" 2>"$TEST_ROOT/noisy-stderr.txt")"
+status=$?
+set -e
+if [[ "$status" -eq 0 ]] &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; assert d["exit_code"]==0' &&
+  grep -q 'progress: starting' "$TEST_ROOT/noisy-stderr.txt" &&
+  grep -q 'warning: chatter' "$TEST_ROOT/noisy-stderr.txt"; then
+  pass "run-workflow-action keeps JSON clean with noisy child"
+else
+  fail "run-workflow-action keeps JSON clean with noisy child"
+  echo "$OUT" | sed 's/^/    stdout: /'
+  sed 's/^/    stderr: /' "$TEST_ROOT/noisy-stderr.txt"
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1
