@@ -5,11 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from workflow_yaml import YAMLError, load_yaml
+
+ALLOWED_RUN_ROOTS = frozenset({"plugin", "project"})
+DEFAULT_RUN_OUTCOMES: dict[str, str] = {"0": "complete", "nonzero": "failed"}
 
 
 class WorkflowResolveError(Exception):
@@ -30,6 +34,140 @@ def discover_known_skills(plugin_root: Path) -> list[str]:
 
 _PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 KNOWN_SKILLS: list[str] = discover_known_skills(_PLUGIN_ROOT)
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def normalize_skill_entry(entry: Any) -> dict[str, Any]:
+    """Normalize a skills registry entry; map exec → run."""
+    if entry is None:
+        return {}
+    if not isinstance(entry, dict):
+        raise WorkflowResolveError(
+            f"skill entry must be a mapping, got {type(entry).__name__}"
+        )
+    normalized = dict(entry)
+    if "exec" in normalized:
+        if "run" in normalized:
+            raise WorkflowResolveError("skill entry cannot set both run and exec")
+        normalized["run"] = normalized.pop("exec")
+    return normalized
+
+
+def _normalize_run_block(run: Any, *, skill_id: str) -> dict[str, Any]:
+    if not isinstance(run, dict):
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run: must be a mapping, got {type(run).__name__}"
+        )
+    if "argv" not in run:
+        raise WorkflowResolveError(f"skills.{skill_id}.run: missing argv")
+    argv = run["argv"]
+    if not isinstance(argv, list) or not argv:
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run.argv: must be a non-empty list"
+        )
+    if not all(isinstance(item, str) and item.strip() for item in argv):
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run.argv: every item must be a non-empty string"
+        )
+
+    allow = run.get("allow", ["plugin", "project"])
+    if not isinstance(allow, list) or not allow:
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run.allow: must be a non-empty list"
+        )
+    allow_norm: list[str] = []
+    for item in allow:
+        if not isinstance(item, str) or item not in ALLOWED_RUN_ROOTS:
+            raise WorkflowResolveError(
+                f"skills.{skill_id}.run.allow: entries must be 'plugin' or 'project'"
+            )
+        if item not in allow_norm:
+            allow_norm.append(item)
+
+    cwd = run.get("cwd", "project")
+    if cwd not in ("project", "plugin"):
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run.cwd: must be 'project' or 'plugin'"
+        )
+
+    outcomes_raw = run.get("outcomes", DEFAULT_RUN_OUTCOMES)
+    if not isinstance(outcomes_raw, dict) or not outcomes_raw:
+        raise WorkflowResolveError(
+            f"skills.{skill_id}.run.outcomes: must be a non-empty mapping"
+        )
+    outcomes: dict[str, str] = {}
+    for key, value in outcomes_raw.items():
+        key_str = str(key)
+        if not isinstance(value, str) or not value.strip():
+            raise WorkflowResolveError(
+                f"skills.{skill_id}.run.outcomes.{key_str}: must be a non-empty string"
+            )
+        if key_str != "nonzero" and not key_str.isdigit() and not (
+            key_str.startswith("-") and key_str[1:].isdigit()
+        ):
+            raise WorkflowResolveError(
+                f"skills.{skill_id}.run.outcomes: keys must be exit codes or 'nonzero'"
+            )
+        outcomes[key_str] = value
+
+    return {
+        "argv": list(argv),
+        "allow": allow_norm,
+        "cwd": cwd,
+        "outcomes": outcomes,
+    }
+
+
+def resolve_run_program(
+    program: str,
+    *,
+    plugin_root: Path,
+    project_root: Path,
+    allow: list[str],
+) -> Path:
+    """Resolve argv[0] to an absolute path under an allowed root."""
+    expanded = Path(os.path.expanduser(program))
+    candidates: list[Path] = []
+    if expanded.is_absolute():
+        candidates.append(expanded)
+    else:
+        if "project" in allow:
+            candidates.append(project_root / expanded)
+        if "plugin" in allow:
+            candidates.append(plugin_root / expanded)
+
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        allowed = False
+        if "project" in allow and _is_relative_to(resolved, project_root):
+            allowed = True
+        if "plugin" in allow and _is_relative_to(resolved, plugin_root):
+            allowed = True
+        if not allowed:
+            continue
+        if resolved.is_file():
+            return resolved
+
+    raise WorkflowResolveError(
+        f"run program not found under allow roots {allow}: {program}"
+    )
+
+
+def outcome_for_exit_code(outcomes: dict[str, str], exit_code: int) -> str:
+    """Map a process exit code to a workflow outcome string."""
+    key = str(exit_code)
+    if key in outcomes:
+        return outcomes[key]
+    if exit_code != 0 and "nonzero" in outcomes:
+        return outcomes["nonzero"]
+    return "failed"
 
 
 def merge_workflows(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -105,9 +243,11 @@ def validate_workflow(
     *,
     project_root: Path,
     bundled_skills: set[str],
+    plugin_root: Path | None = None,
 ) -> list[str]:
     """Validate a merged workflow document. Empty list means valid."""
     errors: list[str] = []
+    root = plugin_root or project_root
 
     version = doc.get("version")
     if version != 1:
@@ -119,35 +259,58 @@ def validate_workflow(
         skills = {}
 
     known_ids = bundled_skills | set(skills.keys())
+    normalized_skills: dict[str, dict[str, Any]] = {}
 
     for skill_id, entry in skills.items():
-        if entry is None:
-            entry = {}
-        if not isinstance(entry, dict):
-            errors.append(f"skills.{skill_id}: must be a mapping")
+        try:
+            normalized = normalize_skill_entry(entry)
+        except WorkflowResolveError as exc:
+            errors.append(f"skills.{skill_id}: {exc}")
             continue
 
-        has_skill = "skill" in entry
-        has_path = "path" in entry
-        if has_skill and has_path:
-            errors.append(f"skills.{skill_id}: cannot set both skill and path")
+        has_skill = "skill" in normalized
+        has_path = "path" in normalized
+        has_run = "run" in normalized
+        modes = sum(bool(flag) for flag in (has_skill, has_path, has_run))
+        if modes > 1:
+            errors.append(
+                f"skills.{skill_id}: cannot combine skill, path, and run/exec"
+            )
 
         if has_skill:
-            alias = entry["skill"]
+            alias = normalized["skill"]
             if not isinstance(alias, str) or not alias.strip():
                 errors.append(f"skills.{skill_id}.skill: must be a non-empty string")
 
         if has_path:
-            path_value = entry["path"]
+            path_value = normalized["path"]
             if not isinstance(path_value, str) or not path_value.strip():
                 errors.append(f"skills.{skill_id}.path: must be a non-empty string")
-                continue
-            resolved = _resolve_skill_path(path_value, project_root)
-            skill_md = resolved / "SKILL.md"
-            if not skill_md.is_file():
-                errors.append(
-                    f"skills.{skill_id}.path: SKILL.md not found at {resolved}"
+            else:
+                resolved = _resolve_skill_path(path_value, project_root)
+                skill_md = resolved / "SKILL.md"
+                if not skill_md.is_file():
+                    errors.append(
+                        f"skills.{skill_id}.path: SKILL.md not found at {resolved}"
+                    )
+
+        if has_run:
+            try:
+                run_block = _normalize_run_block(normalized["run"], skill_id=skill_id)
+                resolve_run_program(
+                    run_block["argv"][0],
+                    plugin_root=root,
+                    project_root=project_root,
+                    allow=run_block["allow"],
                 )
+                normalized["run"] = run_block
+            except WorkflowResolveError as exc:
+                errors.append(str(exc))
+
+        normalized_skills[skill_id] = normalized
+
+    if not errors:
+        doc["skills"] = normalized_skills
 
     transitions = doc.get("transitions") or []
     if not isinstance(transitions, list):
@@ -247,6 +410,7 @@ def resolve_workflow(
         merged,
         project_root=project_root,
         bundled_skills=bundled_skills,
+        plugin_root=plugin_root,
     )
     if errors:
         raise WorkflowResolveError("; ".join(errors))
@@ -257,6 +421,61 @@ def resolve_workflow(
         "entries": merged.get("entries") or {},
         "transitions": merged.get("transitions") or [],
         "ok": True,
+    }
+
+
+def run_workflow_action(
+    *,
+    action_id: str,
+    plugin_root: Path,
+    project_root: Path,
+    user_home: Path,
+    bundled_only: bool = False,
+) -> dict[str, Any]:
+    """Execute a resolved run/exec registry entry and return outcome JSON fields."""
+    resolved = resolve_workflow(
+        plugin_root=plugin_root,
+        project_root=project_root,
+        user_home=user_home,
+        bundled_only=bundled_only,
+    )
+    skills = resolved.get("skills") or {}
+    if action_id not in skills:
+        raise WorkflowResolveError(f"unknown logical id: {action_id}")
+
+    try:
+        entry = normalize_skill_entry(skills[action_id])
+    except WorkflowResolveError as exc:
+        raise WorkflowResolveError(f"skills.{action_id}: {exc}") from exc
+
+    if "run" not in entry:
+        raise WorkflowResolveError(
+            f"logical id {action_id!r} is not a run/exec action"
+        )
+
+    run_block = _normalize_run_block(entry["run"], skill_id=action_id)
+    program = resolve_run_program(
+        run_block["argv"][0],
+        plugin_root=plugin_root,
+        project_root=project_root,
+        allow=run_block["allow"],
+    )
+    argv = [str(program), *run_block["argv"][1:]]
+    cwd = plugin_root if run_block["cwd"] == "plugin" else project_root
+
+    completed = subprocess.run(
+        argv,
+        cwd=str(cwd),
+        check=False,
+    )
+    exit_code = int(completed.returncode)
+    outcome = outcome_for_exit_code(run_block["outcomes"], exit_code)
+    return {
+        "id": action_id,
+        "outcome": outcome,
+        "exit_code": exit_code,
+        "argv": argv,
+        "cwd": str(cwd.resolve()),
     }
 
 
@@ -320,6 +539,67 @@ def main(argv: list[str] | None = None) -> int:
     }
     print(json.dumps(output, indent=2 if args.pretty else None))
     return 0
+
+
+def run_action_main(argv: list[str] | None = None) -> int:
+    """CLI entry for executing a workflow run/exec action."""
+    parser = argparse.ArgumentParser(
+        description="Execute a deterministic workflow run/exec action by logical id."
+    )
+    parser.add_argument(
+        "--id",
+        required=True,
+        help="Logical id of the run/exec registry entry",
+    )
+    parser.add_argument(
+        "--plugin-root",
+        help="Plugin root (default: SUPERPOWERS_PLUGIN_ROOT or repository root)",
+    )
+    parser.add_argument(
+        "--project-root",
+        help="Project root (default: cwd)",
+    )
+    parser.add_argument(
+        "--user-home",
+        help="User home for overlays (default: HOME)",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output",
+    )
+    parser.add_argument(
+        "--bundled-only",
+        action="store_true",
+        help="Skip user and project overlays",
+    )
+    args = parser.parse_args(argv)
+
+    script_dir = Path(__file__).resolve().parent
+    default_plugin_root = script_dir.parent.parent
+    plugin_root = Path(
+        args.plugin_root
+        or os.environ.get("SUPERPOWERS_PLUGIN_ROOT", str(default_plugin_root))
+    )
+    project_root = Path(args.project_root or os.getcwd())
+    user_home = Path(
+        args.user_home or os.environ.get("HOME", os.path.expanduser("~"))
+    )
+
+    try:
+        result = run_workflow_action(
+            action_id=args.id,
+            plugin_root=plugin_root,
+            project_root=project_root,
+            user_home=user_home,
+            bundled_only=args.bundled_only,
+        )
+    except WorkflowResolveError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    print(json.dumps(result, indent=2 if args.pretty else None))
+    return 0 if result["exit_code"] == 0 else 1
 
 
 if __name__ == "__main__":

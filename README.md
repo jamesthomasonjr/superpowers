@@ -265,6 +265,8 @@ To rewire handoffs or replace a skill, add:
 
 Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
 
+Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps — see the workflow config docs. The bundled default graph does not include any.
+
 Inspect the merged map:
 
 ```bash

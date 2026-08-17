@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 - "$SCRIPT_DIR/lib" "$@" <<'PY'
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+from workflow_resolve import run_action_main
+
+raise SystemExit(run_action_main(sys.argv[2:]))
+PY

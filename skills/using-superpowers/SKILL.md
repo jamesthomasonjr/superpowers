@@ -37,12 +37,16 @@ Rules:
 2. When a skill finishes, emit its declared outcome, then select `to` from the
    map for `(from=<logical id>, on=<outcome>)`.
 3. `to: <id>` — invoke that logical id. Resolve via the map's skills registry:
-   `path` → `skill` alias → same name.
-4. `to: null` — no pipeline handoff; continue the session. Description-triggered
+   `run`/`exec` → `path` → `skill` alias → same name.
+4. If the registry entry has `run` (or `exec`), do **not** load a skill. Execute
+   it with `run-workflow-action --id <id>` (or an equivalent harness exec that
+   uses the same argv/allow rules). Read the JSON `outcome`, then continue the
+   map for `(from=<id>, on=<outcome>)`.
+5. `to: null` — no pipeline handoff; continue the session. Description-triggered
    skills (TDD, debugging, verification, etc.) still apply.
-5. `to: wait` — stop and ask your human partner what to do next.
-6. If the outcome is missing from the map, treat it as `wait`.
-7. User instructions still take precedence over skills and the workflow map.
+6. `to: wait` — stop and ask your human partner what to do next.
+7. If the outcome is missing from the map, treat it as `wait`.
+8. User instructions still take precedence over skills and the workflow map.
 
 ## Skill Priority
 

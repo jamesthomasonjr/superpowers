@@ -335,6 +335,193 @@ else
   sed 's/^/    /' "$TEST_ROOT/err-unreadable.txt"
 fi
 
+echo "=== YAML nested mapping under sequence item ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_yaml import load_yaml
+doc = load_yaml("""
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-worktree
+    when:
+      capabilities:
+        - exec-hook
+""")
+t = doc["transitions"][0]
+assert t["when"]["capabilities"] == ["exec-hook"]
+print("ok")
+PY
+then
+  pass "YAML nested mapping under sequence item"
+else
+  fail "YAML nested mapping under sequence item"
+fi
+
+echo "=== validate accepts run entry ==="
+mkdir -p "$PROJ/scripts"
+cat > "$PROJ/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+exit "${FIXTURE_EXIT:-0}"
+EOF
+chmod +x "$PROJ/scripts/ensure-fixture.sh"
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+      outcomes:
+        0: complete
+        nonzero: failed
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-fixture
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+  - from: ensure-fixture
+    on: complete
+    to: writing-plans
+  - from: ensure-fixture
+    on: failed
+    to: wait
+EOF
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); e=d["skills"]["ensure-fixture"]; assert "run" in e; assert e["run"]["argv"][0]=="scripts/ensure-fixture.sh"; assert e["run"]["outcomes"]["0"]=="complete"'; then
+  pass "validate accepts run entry"
+else
+  fail "validate accepts run entry"
+fi
+
+echo "=== exec alias normalizes to run ==="
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    exec:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+EOF
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); e=d["skills"]["ensure-fixture"]; assert "run" in e and "exec" not in e'; then
+  pass "exec alias normalizes to run"
+else
+  fail "exec alias normalizes to run"
+fi
+
+echo "=== reject run+path combination ==="
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    path: ./nope
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-run-path.txt"; then
+  fail "reject run+path combination"
+else
+  if grep -qi 'cannot combine' "$TEST_ROOT/err-run-path.txt"; then
+    pass "reject run+path combination"
+  else
+    fail "reject run+path combination"
+    sed 's/^/    /' "$TEST_ROOT/err-run-path.txt"
+  fi
+fi
+
+echo "=== reject escaped run program ==="
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  bad-run:
+    run:
+      argv:
+        - /bin/true
+      allow:
+        - project
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-escape.txt"; then
+  fail "reject escaped run program"
+else
+  if grep -qi 'not found under allow roots\|run program' "$TEST_ROOT/err-escape.txt"; then
+    pass "reject escaped run program"
+  else
+    fail "reject escaped run program"
+    sed 's/^/    /' "$TEST_ROOT/err-escape.txt"
+  fi
+fi
+
+echo "=== default.yaml has no run actions ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_yaml import load_yaml
+doc = load_yaml((Path(sys.argv[1]) / "workflows" / "default.yaml").read_text())
+for skill_id, entry in (doc.get("skills") or {}).items():
+    assert isinstance(entry, dict)
+    assert "run" not in entry and "exec" not in entry, skill_id
+print("ok")
+PY
+then
+  pass "default.yaml has no run actions"
+else
+  fail "default.yaml has no run actions"
+fi
+
+echo "=== run-workflow-action complete/failed ==="
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+EOF
+if OUT="$(cd "$PROJ" && FIXTURE_EXIT=0 "$REPO_ROOT/scripts/run-workflow-action" --id ensure-fixture --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; assert d["exit_code"]==0'; then
+  pass "run-workflow-action complete"
+else
+  fail "run-workflow-action complete"
+fi
+set +e
+OUT="$(cd "$PROJ" && FIXTURE_EXIT=1 "$REPO_ROOT/scripts/run-workflow-action" --id ensure-fixture --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" 2>/dev/null)"
+status=$?
+set -e
+if [[ "$status" -ne 0 ]] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="failed"; assert d["exit_code"]==1'; then
+  pass "run-workflow-action failed"
+else
+  fail "run-workflow-action failed"
+  echo "$OUT" | sed 's/^/    /'
+fi
+
+echo "=== run-workflow-action rejects skill id ==="
+if "$REPO_ROOT/scripts/run-workflow-action" --id brainstorming --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-not-run.txt"; then
+  fail "run-workflow-action rejects skill id"
+else
+  if grep -qi 'not a run' "$TEST_ROOT/err-not-run.txt"; then
+    pass "run-workflow-action rejects skill id"
+  else
+    fail "run-workflow-action rejects skill id"
+    sed 's/^/    /' "$TEST_ROOT/err-not-run.txt"
+  fi
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1
