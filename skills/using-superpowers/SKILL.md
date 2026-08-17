@@ -46,7 +46,9 @@ Rules:
    skills (TDD, debugging, verification, etc.) still apply.
 6. `to: wait` — stop and ask your human partner what to do next.
 7. If the outcome is missing from the map, treat it as `wait`.
-8. User instructions still take precedence over skills and the workflow map.
+8. The injected map is already filtered for this host's **capabilities**. Do not
+   re-interpret `when:` clauses from overlays — follow the resolved JSON.
+9. User instructions still take precedence over skills and the workflow map.
 
 ## Skill Priority
 

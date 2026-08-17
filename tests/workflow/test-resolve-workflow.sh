@@ -522,6 +522,128 @@ else
   fi
 fi
 
+echo "=== gated transitions append without replace-by-from ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import merge_workflows
+
+base = {
+  "version": 1,
+  "skills": {},
+  "entries": {},
+  "transitions": [
+    {"from": "brainstorming", "on": "approved-architectural", "to": "writing-plans"},
+    {"from": "brainstorming", "on": "approved-bounded", "to": None},
+  ],
+}
+overlay = {
+  "transitions": [
+    {
+      "from": "brainstorming",
+      "on": "approved-architectural",
+      "to": "ensure-fixture",
+      "when": {"capabilities": ["exec-hook"]},
+    }
+  ]
+}
+merged = merge_workflows(base, overlay)
+assert len([t for t in merged["transitions"] if t["from"] == "brainstorming"]) == 3
+assert any(t.get("when") for t in merged["transitions"])
+assert any(t["on"] == "approved-bounded" for t in merged["transitions"])
+print("ok")
+PY
+then
+  pass "gated transitions append without replace-by-from"
+else
+  fail "gated transitions append without replace-by-from"
+fi
+
+echo "=== capability filter selects gated edge ==="
+mkdir -p "$PROJ/scripts" "$PROJ/.superpowers"
+cat > "$PROJ/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$PROJ/scripts/ensure-fixture.sh"
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-fixture
+    when:
+      capabilities:
+        - exec-hook
+EOF
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="writing-plans"; assert "ensure-fixture" not in d["skills"] or d["skills"].get("ensure-fixture")=={} or "run" not in d["skills"].get("ensure-fixture",{})'; then
+  pass "without capability keeps baseline edge"
+else
+  fail "without capability keeps baseline edge"
+fi
+if OUT="$(cd "$PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" --capabilities exec-hook)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "exec-hook" in d["capabilities"]; t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="ensure-fixture"; assert "when" not in t; assert "run" in d["skills"]["ensure-fixture"]'; then
+  pass "with capability selects gated edge"
+else
+  fail "with capability selects gated edge"
+fi
+
+echo "=== SUPERPOWERS_CAPABILITIES env works ==="
+if OUT="$(cd "$PROJ" && SUPERPOWERS_CAPABILITIES=exec-hook "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="ensure-fixture"'; then
+  pass "SUPERPOWERS_CAPABILITIES env works"
+else
+  fail "SUPERPOWERS_CAPABILITIES env works"
+fi
+
+echo "=== detect-capabilities adds session-inject ==="
+if OUT="$(cd "$PROJ" && CURSOR_PLUGIN_ROOT=/tmp "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" --detect-capabilities --bundled-only)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "session-inject" in d["capabilities"]'; then
+  pass "detect-capabilities adds session-inject"
+else
+  fail "detect-capabilities adds session-inject"
+fi
+
+echo "=== ambiguous equally-specific transitions fail ==="
+cat > "$PROJ/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+    when:
+      capabilities:
+        - exec-hook
+  - from: brainstorming
+    on: approved-architectural
+    to: writing-plans
+    when:
+      capabilities:
+        - native-worktree
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$PROJ" --user-home "$TEST_HOME" --capabilities exec-hook,native-worktree >/dev/null 2>"$TEST_ROOT/err-ambig.txt"; then
+  fail "ambiguous equally-specific transitions fail"
+else
+  if grep -qi 'ambiguous' "$TEST_ROOT/err-ambig.txt"; then
+    pass "ambiguous equally-specific transitions fail"
+  else
+    fail "ambiguous equally-specific transitions fail"
+    sed 's/^/    /' "$TEST_ROOT/err-ambig.txt"
+  fi
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1

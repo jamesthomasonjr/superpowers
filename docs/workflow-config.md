@@ -7,6 +7,7 @@ Config layers stay under `.superpowers/` so overlays remain familiar; the **plug
 **Design specs:**
 - [Configurable workflow graph](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
 - [Deterministic run/exec actions](superpowers/specs/2026-08-17-workflow-run-actions-design.md)
+- [Capability-aware overlays](superpowers/specs/2026-08-17-workflow-capability-overlays-design.md)
 
 ## Layer precedence
 
@@ -95,6 +96,52 @@ Notes:
 ```
 
 The command prints JSON including `outcome` and `exit_code`. Use `outcome` as the map's `on` for the next handoff.
+
+## Capability-aware overlays
+
+Hosts differ (SessionStart injection, native worktrees, subagents, exec hooks, Canvas). Overlays may gate transitions and skill registry entries with `when.capabilities` so enhanced edges apply only when the host advertises those tokens.
+
+```yaml
+version: 1
+
+skills:
+  ensure-worktree:
+    run:
+      argv:
+        - scripts/ensure-worktree.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-worktree
+    when:
+      capabilities:
+        - exec-hook
+```
+
+Notes:
+
+- **Gated** overlay transitions (`when:` present) are **appended** and do not replace baseline edges for that `from`.
+- **Ungated** overlay transitions still use replace-by-`from`.
+- At resolve time, among matching `(from, on)` candidates, the most specific satisfied `when` wins.
+- Resolved JSON includes a `capabilities` list and has `when` stripped — agents follow the filtered map as-is.
+- Pass capabilities explicitly or via env:
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME" \
+  --capabilities session-inject,exec-hook --pretty
+
+SUPERPOWERS_CAPABILITIES=exec-hook ./scripts/resolve-workflow ...
+```
+
+SessionStart passes `--detect-capabilities` (currently auto-detects `session-inject` when hook env is present) and honors `SUPERPOWERS_CAPABILITIES`.
+
+Known tokens: `session-inject`, `native-worktree`, `subagents`, `exec-hook`, `native-canvas`.
 
 ## Example: replace brainstorming with a custom skill path
 
