@@ -4,7 +4,9 @@
 
 Config layers stay under `.superpowers/` so overlays remain familiar; the **plugin id** is `supersuit`.
 
-**Design spec:** [docs/superpowers/specs/2026-08-16-configurable-workflow-graph-design.md](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
+**Design specs:**
+- [Configurable workflow graph](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
+- [Deterministic run/exec actions](superpowers/specs/2026-08-17-workflow-run-actions-design.md)
 
 ## Layer precedence
 
@@ -32,13 +34,67 @@ Add `--pretty` for readable JSON.
 
 | `to` value | Meaning |
 |------------|---------|
-| `<logical id>` | Invoke that skill next (resolve via the skills registry). |
+| `<logical id>` | Invoke that logical id next (resolve via the skills registry). |
 | `null` | No pipeline handoff — continue the session. Description-triggered skills (TDD, debugging, etc.) still apply. |
 | `wait` | Stop and ask your human partner what to do next. |
 
 Every transition **must** include an explicit `to` key. Omitting `to` is a validation error (it is not treated as `null`). Write `to: null` when you want continue-session.
 
 If a skill emits an outcome with no matching transition, treat it as `wait`.
+
+## Skills registry lookup
+
+For a logical id, resolve in order:
+
+1. **`run` / `exec`** — deterministic action (see below)
+2. **`path`** — load `SKILL.md` from that directory
+3. **`skill`** — invoke that installed skill name
+4. else — invoke/load the logical id as a same-name skill
+
+A registry entry may set only one of `run`/`exec`, `path`, or `skill`.
+
+## Deterministic run / exec actions
+
+Mechanical steps (ensure a worktree, lay out paths, etc.) can be registry entries that run an allowlisted argv instead of an LLM skill. The bundled default graph does **not** include any `run` actions — add them only via overlays.
+
+```yaml
+version: 1
+
+skills:
+  ensure-worktree:
+    run:
+      argv:
+        - scripts/ensure-worktree.sh
+      allow:
+        - project
+      outcomes:
+        0: complete
+        nonzero: failed
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-worktree
+  - from: ensure-worktree
+    on: complete
+    to: writing-plans
+  - from: ensure-worktree
+    on: failed
+    to: wait
+```
+
+Notes:
+
+- `exec:` is accepted as an alias for `run:` and is normalized to `run` in resolved JSON.
+- `argv[0]` must resolve to a file under the allowlisted roots (`plugin` and/or `project`; default both).
+- Relative programs are tried under project root, then plugin root (when allowed).
+- Execute with:
+
+```bash
+./scripts/run-workflow-action --id ensure-worktree --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME"
+```
+
+The command prints JSON including `outcome` and `exit_code` on **stdout**. Child script stdout/stderr are forwarded to the CLI's stderr so the JSON stays parseable. Use `outcome` as the map's `on` for the next handoff.
 
 ## Example: replace brainstorming with a custom skill path
 
@@ -96,6 +152,7 @@ The resolver validates merged config before emitting JSON. Common failures:
 - duplicate `(from, on)` pairs
 - each transition must include `to` (`null`, `wait`, or a known logical skill id)
 - `path` must point at a directory containing `SKILL.md`
-- a skill entry cannot set both `skill` and `path`
+- a skill entry cannot combine `skill`, `path`, and `run`/`exec`
+- `run.argv[0]` must exist under the entry's `allow` roots
 
 On SessionStart overlay failure, the hook warns and injects the bundled map. If even bundled resolve fails, it warns that no `WORKFLOW_MAP` is available (and does not claim defaults are in effect). Fix the YAML and start a new session, or run `resolve-workflow` manually to see errors on stderr.

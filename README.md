@@ -265,6 +265,8 @@ To rewire handoffs or replace a skill, add:
 
 Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
 
+Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps — see the workflow config docs. The bundled default graph does not include any.
+
 Inspect the merged map:
 
 ```bash
@@ -309,6 +311,7 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 **Workflow**
 - **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
 - **`scripts/resolve-workflow`** - Merge and validate overlays
+- **`scripts/run-workflow-action`** - Execute a deterministic `run`/`exec` registry entry
 
 ## Philosophy
 

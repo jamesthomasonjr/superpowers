@@ -195,7 +195,9 @@ def _parse_sequence(lines: list[tuple[int, str]], index: int, indent: int) -> tu
                 index += 1
                 index = _skip_blank(lines, index)
                 while index < len(lines) and _indent_of(lines[index][1]) > indent:
-                    nested_line = _content(lines[index][1])
+                    nested_line_no, nested_raw = lines[index]
+                    nested_indent = _indent_of(nested_raw)
+                    nested_line = _content(nested_raw)
                     if nested_line.startswith("- "):
                         break
                     nested_key, nested_sep, nested_remainder = nested_line.partition(":")
@@ -205,8 +207,22 @@ def _parse_sequence(lines: list[tuple[int, str]], index: int, indent: int) -> tu
                     nested_remainder = nested_remainder.strip()
                     if nested_remainder == "":
                         index += 1
-                        nested, index = _parse_mapping(lines, index, indent + 2)
+                        index = _skip_blank(lines, index)
+                        if index >= len(lines) or _indent_of(lines[index][1]) <= nested_indent:
+                            item[nested_key] = None
+                            continue
+                        child_indent = nested_indent + 2
+                        if _content(lines[index][1]).startswith("- "):
+                            nested, index = _parse_sequence(lines, index, child_indent)
+                        else:
+                            nested, index = _parse_mapping(lines, index, child_indent)
                         item[nested_key] = nested
+                    elif nested_remainder == "{}":
+                        item[nested_key] = {}
+                        index += 1
+                    elif nested_remainder == "[]":
+                        item[nested_key] = []
+                        index += 1
                     else:
                         item[nested_key] = _parse_scalar(nested_remainder)
                         index += 1
