@@ -40,7 +40,7 @@ harnesses or allowlisted scripts are a better fit for deterministic work.
 | 4 | Relative program paths resolve against **project root** first, then **plugin root** if not found (when both allowed). | Project overlays can ship scripts; plugin can ship shared helpers. |
 | 5 | Exit → outcome via `run.outcomes` map; keys `0` / integer strings and optional `nonzero`. Defaults: `0→complete`, `nonzero→failed`. | Enough for chaining; no JSON protocol required for v1. |
 | 6 | `run` is mutually exclusive with `skill` and `path` on the same registry entry. | One resolution mode per logical id. |
-| 7 | Helper CLI `scripts/run-workflow-action` executes a resolved run id and prints `{id, outcome, exit_code}`. | Harnesses and agents get a deterministic executor without inventing argv. |
+| 7 | Helper CLI `scripts/run-workflow-action` executes a resolved run id and prints `{id, outcome, exit_code}`. Child stdout/stderr are captured and forwarded to the CLI's stderr so result JSON on stdout stays parseable. | Harnesses and agents get a deterministic executor without inventing argv. |
 | 8 | Schema stays `version: 1` (additive). | Overlay adoption is still early; no need for 1.1 yet. |
 
 ## Config shape

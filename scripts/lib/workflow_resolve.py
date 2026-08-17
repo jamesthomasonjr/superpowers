@@ -651,11 +651,22 @@ def run_workflow_action(
     argv = [str(program), *run_block["argv"][1:]]
     cwd = plugin_root if run_block["cwd"] == "plugin" else project_root
 
+    # Capture child streams so they cannot corrupt the JSON result on stdout.
     completed = subprocess.run(
         argv,
         cwd=str(cwd),
         check=False,
+        capture_output=True,
+        text=True,
     )
+    if completed.stdout:
+        sys.stderr.write(completed.stdout)
+        if not completed.stdout.endswith("\n"):
+            sys.stderr.write("\n")
+    if completed.stderr:
+        sys.stderr.write(completed.stderr)
+        if not completed.stderr.endswith("\n"):
+            sys.stderr.write("\n")
     exit_code = int(completed.returncode)
     outcome = outcome_for_exit_code(run_block["outcomes"], exit_code)
     return {
