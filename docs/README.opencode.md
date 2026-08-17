@@ -1,6 +1,6 @@
 # Supersuit for OpenCode
 
-Complete guide for using **Supersuit** (configurable Superpowers fork) with [OpenCode.ai](https://opencode.ai).
+Complete guide for using **Supersuit** — a framework for custom Superpowers-based workflows (not a Superpowers replacement) — with [OpenCode.ai](https://opencode.ai).
 
 ## Installation
 
@@ -8,7 +8,7 @@ Add this repository to the `plugin` array in your `opencode.json` (global or pro
 
 ```json
 {
-  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
+  "plugin": ["supersuit@git+https://github.com/jeighty/supersuit.git"]
 }
 ```
 
@@ -89,7 +89,7 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install supersuit@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
+npm install supersuit@git+https://github.com/jeighty/supersuit.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
@@ -113,7 +113,7 @@ Then use the installed package path in `opencode.json`:
 
 ## Getting Help
 
-- Report issues: https://github.com/jamesthomasonjr/superpowers/issues
-- Main documentation: https://github.com/jamesthomasonjr/superpowers
+- Report issues: https://github.com/jeighty/supersuit/issues
+- Main documentation: https://github.com/jeighty/supersuit
 - Upstream Superpowers: https://github.com/obra/superpowers
 - OpenCode docs: https://opencode.ai/docs/

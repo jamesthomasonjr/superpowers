@@ -1,6 +1,6 @@
 name: supersuit
 version: 6.3.0
-description: Supersuit — Superpowers fork with configurable workflow overlays for Hermes Agent
-author: jamesthomasonjr
+description: Supersuit — framework for Superpowers-based workflows (not a Superpowers replacement); Hermes Agent plugin
+author: jeighty
 provides_hooks:
   - pre_llm_call

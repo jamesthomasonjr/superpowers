@@ -1,13 +1,13 @@
 {
   "name": "supersuit",
   "version": "6.3.0",
-  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
+  "description": "Supersuit \u2014 a framework for building your own Superpowers-based workflow and skill toolchain (methodology by Jesse Vincent / obra / Prime Radiant). Not a Superpowers replacement; defaults match until you customize.",
   "author": {
     "name": "James Thomason Jr.",
     "email": "github@jamesthomasonjr.com"
   },
-  "homepage": "https://github.com/jamesthomasonjr/superpowers",
-  "repository": "https://github.com/jamesthomasonjr/superpowers",
+  "homepage": "https://github.com/jeighty/supersuit",
+  "repository": "https://github.com/jeighty/supersuit",
   "license": "MIT",
   "keywords": [
     "brainstorming",

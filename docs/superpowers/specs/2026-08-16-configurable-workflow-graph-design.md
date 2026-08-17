@@ -1,12 +1,14 @@
 # Configurable Workflow Graph — Design Spec
 
 **Status:** Implemented on this fork (brainstormed 2026-08-16).
-**Product name:** **Supersuit** — fork of Superpowers with a configurable
-workflow graph. Plugin/package id is `supersuit` (not `superpowers`). Config
+**Product name:** **Supersuit** — a framework for building your own
+Superpowers-based workflow and skill toolchain (not a Superpowers replacement).
+Plugin/package id is `supersuit` (not `superpowers`). Config
 filesystem contract remains `.superpowers/` and related Superpowers paths;
 bootstrap skill folder remains `using-superpowers` (invoked as
 `supersuit:using-superpowers`).
-**Scope:** This fork (`jamesthomasonjr/superpowers`). Not proposed for upstream
+**Canonical repo:** `jeighty/supersuit`.
+**Scope:** This fork (`jeighty/supersuit`). Not proposed for upstream
 `obra/superpowers` core without a separate upstream conversation — upstream
 treats the opinionated chain as product, and fork-specific workflow
 customization is explicitly out of their acceptance criteria.

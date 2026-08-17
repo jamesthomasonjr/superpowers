@@ -1,14 +1,14 @@
 {
   "name": "supersuit",
   "version": "6.3.0",
-  "description": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers.",
+  "description": "Supersuit \u2014 a framework for building your own Superpowers-based workflow and skill toolchain (methodology by Jesse Vincent / obra / Prime Radiant). Not a Superpowers replacement; defaults match until you customize.",
   "author": {
     "name": "James Thomason Jr.",
     "email": "github@jamesthomasonjr.com",
     "url": "https://github.com/jamesthomasonjr"
   },
-  "homepage": "https://github.com/jamesthomasonjr/superpowers",
-  "repository": "https://github.com/jamesthomasonjr/superpowers",
+  "homepage": "https://github.com/jeighty/supersuit",
+  "repository": "https://github.com/jeighty/supersuit",
   "license": "MIT",
   "keywords": [
     "brainstorming",
@@ -24,8 +24,8 @@
   "hooks": {},
   "interface": {
     "displayName": "Supersuit",
-    "shortDescription": "Configurable Superpowers workflows for coding agents",
-    "longDescription": "Supersuit \u2014 a fork of Superpowers (by Jesse Vincent / obra / Prime Radiant) with optional configurable workflow overlays. Defaults match Superpowers. Install this plugin instead of upstream Superpowers \u2014 do not enable both.",
+    "shortDescription": "Framework for custom Superpowers-based agent workflows",
+    "longDescription": "Supersuit \u2014 a framework for building your own Superpowers-based workflow and skill toolchain (methodology by Jesse Vincent / obra / Prime Radiant). Not a Superpowers replacement; defaults match until you customize. Do not enable alongside upstream Superpowers.",
     "developerName": "James Thomason Jr.",
     "category": "Developer Tools",
     "capabilities": [
@@ -37,7 +37,7 @@
       "I've got an idea for something I'd like to build.",
       "Let's add a feature to this project."
     ],
-    "websiteURL": "https://github.com/jamesthomasonjr/superpowers",
+    "websiteURL": "https://github.com/jeighty/supersuit",
     "privacyPolicyURL": "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement",
     "termsOfServiceURL": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
     "brandColor": "#F59E0B",
