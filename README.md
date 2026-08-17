@@ -311,6 +311,7 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 **Workflow**
 - **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
 - **`scripts/resolve-workflow`** - Merge and validate overlays
+- **`scripts/run-workflow-action`** - Execute a deterministic `run`/`exec` registry entry
 
 ## Philosophy
 
