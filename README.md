@@ -1,10 +1,14 @@
 # Supersuit
 
-**Supersuit** is a fork of [Superpowers](https://github.com/obra/superpowers): the same composable skills and coding-agent workflow, with an optional **configurable workflow graph** so you can rewire handoffs or replace individual skills without forking skill prose.
+**Supersuit** is a framework for building your own development workflow and skill toolchain, grounded in [Superpowers](https://github.com/obra/superpowers) methodology. It is **not intended to replace Superpowers** — it is for people who have spent time with Superpowers and want to evolve their process without starting from scratch.
+
+Out of the box you get the same composable skills and coding-agent pipeline Superpowers ships, plus an optional **configurable workflow graph** so you can rewire handoffs or replace individual skills without forking skill prose.
 
 With no overrides, behavior matches Superpowers. Add a user or project workflow file only when you want something different.
 
 > **Name note:** Unrelated to Farama Foundation’s deprecated RL library also called SuperSuit. This project is for coding-agent skills and workflows.
+
+**Repository:** [jeighty/supersuit](https://github.com/jeighty/supersuit) (formerly `jamesthomasonjr/superpowers`)
 
 ## Table of Contents
 
@@ -39,12 +43,14 @@ With no overrides, behavior matches Superpowers. Add a user or project workflow 
 
 ## What is Supersuit?
 
-Supersuit keeps Superpowers’ methodology — brainstorm before coding, plan in detail, TDD, systematic debugging, subagent-driven execution, finish the branch — and makes the **pipeline** data-driven:
+Supersuit keeps Superpowers’ methodology — brainstorm before coding, plan in detail, TDD, systematic debugging, subagent-driven execution, finish the branch — and turns that proven chain into a **framework you can extend**:
 
 - Skills emit stable **outcomes** instead of hard-coding the next skill.
 - A **workflow map** decides what runs next (`to: <skill>`, `null`, or `wait`).
 - You can **alias or path-override** individual skills by logical id.
 - Config layers: bundled defaults → `~/.superpowers/workflow.yaml` → `.superpowers/workflow.yaml`.
+
+Use Superpowers when you want the maintained upstream product. Use Supersuit when you want that methodology as a base and need to shape the toolchain yourself.
 
 ## Identity model (what changes vs what stays)
 
@@ -52,9 +58,11 @@ Keeping the install id as `superpowers` while shipping a fork is confusing for u
 
 | Layer | Choice | Why |
 |-------|--------|-----|
+| GitHub repository | **`jeighty/supersuit`** | Memorable org/repo; distinct from `obra/superpowers` and the personal fork path |
 | Plugin / package id | **`supersuit`** | Distinct install; can sit beside docs about Superpowers without impersonating the upstream plugin |
 | Author / maintainer | **This fork’s maintainer** | Upstream author credited in descriptions; manifests must not claim to be Jesse Vincent / obra |
 | Display name | **Supersuit** | What humans see in marketplaces |
+| Positioning | **Framework, not replacement** | Evolve your workflow after Superpowers; do not displace the upstream product |
 | Skill namespace | **`supersuit:<skill>`** | Matches plugin id (e.g. `supersuit:brainstorming`) |
 | Bootstrap skill folder | `using-superpowers` | Still teaches the Superpowers methodology; invoked as `supersuit:using-superpowers` |
 | Config dirs | **`.superpowers/`** / `~/.superpowers/` | Workflow overlays stay compatible with the design already documented; no forced migration |
@@ -64,8 +72,11 @@ Keeping the install id as `superpowers` while shipping a fork is confusing for u
 
 ## Relationship to Superpowers
 
-| | Superpowers (`obra/superpowers`) | Supersuit (this fork) |
-|--|----------------------------------|------------------------|
+Supersuit is a **derivative framework**, not a competitor or drop-in substitute meant to displace Superpowers. Prefer [obra/superpowers](https://github.com/obra/superpowers) for the canonical product and community. Prefer this repo when you specifically need overlayable workflows and a distinct install identity.
+
+| | Superpowers (`obra/superpowers`) | Supersuit (`jeighty/supersuit`) |
+|--|----------------------------------|--------------------------------|
+| Intent | The product | Framework to evolve *your* workflow on that base |
 | Plugin id | `superpowers` | `supersuit` |
 | Skills & methodology | Opinionated, proven chain | Same by default |
 | Pipeline handoffs | Encoded in skill prose | Resolved workflow map |
@@ -84,7 +95,7 @@ After you've signed off on the design, your agent puts together an implementatio
 
 Next up, once you say "go", it launches a *subagent-driven-development* process, having agents work through each engineering task, inspecting and reviewing their work, and continuing forward. It's not uncommon for your agent to work autonomously for a couple hours at a time without deviating from the plan you put together.
 
-There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent just has Supersuit — wearing Superpowers by default.
+There's a bunch more to it, but that's the core of the system. And because the skills trigger automatically, you don't need to do anything special. Your coding agent runs Supersuit with Superpowers methodology by default — until you customize the map.
 
 ## Installation
 
@@ -99,7 +110,7 @@ Install from this repository (not the official marketplace plugin, which is upst
 ```bash
 # From a local clone, or register this fork as a marketplace / plugin source
 # per your Claude Code plugin workflow, pointing at:
-#   https://github.com/jamesthomasonjr/superpowers
+#   https://github.com/jeighty/supersuit
 ```
 
 If you only need stock Superpowers without workflow overlays, you can still use the [official Claude plugin marketplace](https://claude.com/plugins/superpowers) or `obra/superpowers-marketplace`.
@@ -109,7 +120,7 @@ If you only need stock Superpowers without workflow overlays, you can still use 
 Install Supersuit as a plugin from this repository:
 
 ```bash
-agy plugin install https://github.com/jamesthomasonjr/superpowers
+agy plugin install https://github.com/jeighty/supersuit
 ```
 
 Antigravity runs the plugin's session-start hook, so Supersuit is active from
@@ -117,7 +128,7 @@ the first message. Reinstall with the same command to update.
 
 ### Codex App
 
-Official Codex marketplace listings may install upstream Superpowers. For Supersuit, install or point the plugin at this repository: [https://github.com/jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers).
+Official Codex marketplace listings may install upstream Superpowers. For Supersuit, install or point the plugin at this repository: [https://github.com/jeighty/supersuit](https://github.com/jeighty/supersuit).
 
 ### Codex CLI
 
@@ -125,14 +136,14 @@ Same as Codex App: use this repository when you want Supersuit’s workflow map.
 
 ### Cursor
 
-Install from this repository (for example via a git-based or local plugin install pointing at [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers)). Marketplace `/add-plugin superpowers` may install upstream Superpowers instead of this fork.
+Install from this repository (for example via a git-based or local plugin install pointing at [jeighty/supersuit](https://github.com/jeighty/supersuit)). Marketplace `/add-plugin superpowers` may install upstream Superpowers instead of this fork.
 
 ### Devin CLI
 
 - Install the plugin from this repository:
 
   ```bash
-  devin plugins install jamesthomasonjr/superpowers
+  devin plugins install jeighty/supersuit
   ```
 
 - Update to the latest version with:
@@ -146,7 +157,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Register the marketplace:
 
   ```bash
-  droid plugin marketplace add https://github.com/jamesthomasonjr/superpowers
+  droid plugin marketplace add https://github.com/jeighty/supersuit
   ```
 
 - Install the plugin:
@@ -160,7 +171,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Install the extension:
 
   ```bash
-  gemini extensions install https://github.com/jamesthomasonjr/superpowers
+  gemini extensions install https://github.com/jeighty/supersuit
   ```
 
 - Update later:
@@ -171,18 +182,18 @@ Install from this repository (for example via a git-based or local plugin instal
 
 ### GitHub Copilot CLI
 
-Install from this repository / a marketplace entry that points at [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers). The `obra/superpowers-marketplace` entry is upstream Superpowers.
+Install from this repository / a marketplace entry that points at [jeighty/supersuit](https://github.com/jeighty/supersuit). The `obra/superpowers-marketplace` entry is upstream Superpowers.
 
 ### Grok Build CLI
 
-Official Grok marketplace `superpowers` is likely upstream. For Supersuit, install from [this repository](https://github.com/jamesthomasonjr/superpowers) when your harness supports a git URL.
+Official Grok marketplace `superpowers` is likely upstream. For Supersuit, install from [this repository](https://github.com/jeighty/supersuit) when your harness supports a git URL.
 
 ### Kimi Code
 
 - Install directly from this repository:
 
   ```text
-  /plugins install https://github.com/jamesthomasonjr/superpowers
+  /plugins install https://github.com/jeighty/supersuit
   ```
 
 - Detailed docs: [docs/README.kimi.md](docs/README.kimi.md)
@@ -195,14 +206,14 @@ already use Superpowers in another harness.
 - Tell OpenCode:
 
   ```
-  Fetch and follow instructions from https://raw.githubusercontent.com/jamesthomasonjr/superpowers/refs/heads/main/.opencode/INSTALL.md
+  Fetch and follow instructions from https://raw.githubusercontent.com/jeighty/supersuit/refs/heads/main/.opencode/INSTALL.md
   ```
 
 - Or add to `opencode.json`:
 
   ```json
   {
-    "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
+    "plugin": ["supersuit@git+https://github.com/jeighty/supersuit.git"]
   }
   ```
 
@@ -213,13 +224,13 @@ already use Superpowers in another harness.
 Install Supersuit as a Pi package from this repository:
 
 ```bash
-pi install git:github.com/jamesthomasonjr/superpowers
+pi install git:github.com/jeighty/supersuit
 ```
 
 For local development, run Pi with this checkout loaded as a temporary package:
 
 ```bash
-pi -e /path/to/superpowers
+pi -e /path/to/supersuit
 ```
 
 The Pi package loads the skills and a small extension that injects the `using-superpowers` bootstrap at session startup and again after compaction. Pi has native skills, so no compatibility `Skill` tool is required. Subagent and task-list tools remain optional Pi companion packages.
@@ -229,7 +240,7 @@ The Pi package loads the skills and a small extension that injects the `using-su
 Install Supersuit as a Hermes plugin from this repository:
 
 ```bash
-hermes plugins install jamesthomasonjr/superpowers --enable
+hermes plugins install jeighty/supersuit --enable
 ```
 
 Restart any active Hermes sessions after installing. Note: Hermes has no
@@ -275,9 +286,9 @@ Inspect the merged map:
 
 ## Upstream & community
 
-Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) and [Prime Radiant](https://primeradiant.com).
+Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) and [Prime Radiant](https://primeradiant.com). Full credit for the methodology and skills library belongs upstream. This project exists so practitioners can keep that foundation while building a personal or team-specific toolchain.
 
-- **This fork (issues & PRs):** https://github.com/jamesthomasonjr/superpowers
+- **This project (issues & PRs):** https://github.com/jeighty/supersuit
 - **Upstream Superpowers:** https://github.com/obra/superpowers
 - **Upstream Discord:** [Join](https://discord.gg/35wsABTejz) for Superpowers community support
 - **Upstream commercial support:** sales@primeradiant.com (Prime Radiant / Superpowers — not this fork)
@@ -325,10 +336,10 @@ Read [the original Superpowers release announcement](https://blog.fsck.com/2025/
 
 ## Contributing
 
-This is a fork. Prefer proposing compatible improvements upstream to [obra/superpowers](https://github.com/obra/superpowers) when they fit core. Fork-specific work (workflow graph, Supersuit docs) lands here.
+This is a framework fork, not a Superpowers replacement. Prefer proposing compatible improvements upstream to [obra/superpowers](https://github.com/obra/superpowers) when they fit core. Fork-specific work (workflow graph, Supersuit docs, framework tooling) lands here.
 
 1. Fork or branch from this repository
-2. Prefer the branch that carries active fork work (see open PRs / `cursor/modular-functionality-*`)
+2. Prefer `main` for released fork work; use feature branches for open PRs
 3. Create a branch for your change
 4. Follow `writing-skills` for skill content changes; keep behavior-shaping edits evidence-backed
 5. Open a PR against this fork and describe whether the change is fork-specific or a candidate for upstream
@@ -339,7 +350,7 @@ See `skills/writing-skills/SKILL.md` for the complete skills guide.
 
 ## Updating
 
-Updates are harness-dependent. For git installs, pull or reinstall from [jamesthomasonjr/superpowers](https://github.com/jamesthomasonjr/superpowers).
+Updates are harness-dependent. For git installs, pull or reinstall from [jeighty/supersuit](https://github.com/jeighty/supersuit).
 
 ## License
 

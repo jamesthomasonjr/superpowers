@@ -1,17 +1,19 @@
 # Installing Supersuit for OpenCode
 
+Supersuit is a framework for building your own Superpowers-based workflow and skill toolchain — **not** a Superpowers replacement. Defaults match upstream until you add overlays.
+
 ## Prerequisites
 
 - [OpenCode.ai](https://opencode.ai) installed
 
 ## Installation
 
-Add this fork to the `plugin` array in your `opencode.json` (global or project-level).
+Add this repository to the `plugin` array in your `opencode.json` (global or project-level).
 The package id is **`supersuit`**.
 
 ```json
 {
-  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git"]
+  "plugin": ["supersuit@git+https://github.com/jeighty/supersuit.git"]
 }
 ```
 
@@ -61,11 +63,11 @@ and Bun versions pin that resolved git dependency in a lockfile or cache, so a
 restart may not pick up the newest commit. If updates do not appear,
 clear OpenCode's package cache or reinstall the plugin.
 
-To pin a specific ref:
+To pin a specific ref (branch, tag, or SHA):
 
 ```json
 {
-  "plugin": ["supersuit@git+https://github.com/jamesthomasonjr/superpowers.git#cursor/modular-functionality-aa6a"]
+  "plugin": ["supersuit@git+https://github.com/jeighty/supersuit.git#main"]
 }
 ```
 
@@ -86,7 +88,7 @@ the plugin, try installing with system npm and pointing OpenCode at the local
 package:
 
 ```powershell
-npm install supersuit@git+https://github.com/jamesthomasonjr/superpowers.git --prefix "$HOME\.config\opencode"
+npm install supersuit@git+https://github.com/jeighty/supersuit.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
@@ -117,6 +119,6 @@ Skills speak in actions ("create a todo", "dispatch a subagent", "read a file").
 
 ## Getting Help
 
-- Report issues: https://github.com/jamesthomasonjr/superpowers/issues
-- Full documentation: https://github.com/jamesthomasonjr/superpowers/blob/main/docs/README.opencode.md
+- Report issues: https://github.com/jeighty/supersuit/issues
+- Full documentation: https://github.com/jeighty/supersuit/blob/main/docs/README.opencode.md
 - Upstream Superpowers: https://github.com/obra/superpowers

@@ -8,7 +8,7 @@ BOOTSTRAP_MARKER = "supersuit:using-superpowers bootstrap for hermes"
 def _skills_dir() -> str:
     """Locate the stock skills/ tree for either supported install layout.
 
-    - git-clone install (`hermes plugins install jamesthomasonjr/superpowers`): the plugin
+    - git-clone install (`hermes plugins install jeighty/supersuit`): the plugin
       dir is the repo root, so `.hermes-plugin/` and `skills/` are siblings and
       this module resolves `../skills`.
     - flattened install (plugin files copied to the plugin dir root): `skills/`
@@ -28,7 +28,7 @@ def _skills_dir() -> str:
     raise RuntimeError(
         "supersuit plugin: cannot find the skills/ tree "
         f"(looked at {candidates}). Reinstall with "
-        "`hermes plugins install jamesthomasonjr/superpowers`."
+        "`hermes plugins install jeighty/supersuit`."
     )
 
 

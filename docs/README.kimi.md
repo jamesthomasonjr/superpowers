@@ -1,19 +1,13 @@
 # Supersuit for Kimi Code
 
-Complete guide for using **Supersuit** (configurable Superpowers fork) with [Kimi Code](https://github.com/MoonshotAI/kimi-code).
+Complete guide for using **Supersuit** — a framework for custom Superpowers-based workflows (not a Superpowers replacement) — with [Kimi Code](https://github.com/MoonshotAI/kimi-code).
 
 ## Installation
 
 Install from this repository:
 
 ```text
-/plugins install https://github.com/jamesthomasonjr/superpowers
-```
-
-For a specific branch:
-
-```text
-/plugins install https://github.com/jamesthomasonjr/superpowers/tree/cursor/modular-functionality-aa6a
+/plugins install https://github.com/jeighty/supersuit
 ```
 
 Kimi Code's marketplace entry named "Superpowers" may point at upstream. Prefer the GitHub URL above for Supersuit.
@@ -67,10 +61,10 @@ Select the installed plugin and update it from there, or reinstall from the GitH
 
 ### Direct GitHub install used an old release
 
-Kimi Code installs the latest GitHub release for a bare repository URL when one exists. To test unreleased fork work, install the branch explicitly:
+Kimi Code installs the latest GitHub release for a bare repository URL when one exists. To test unreleased fork work, install a branch explicitly (replace with the branch you need):
 
 ```text
-/plugins install https://github.com/jamesthomasonjr/superpowers/tree/cursor/modular-functionality-aa6a
+/plugins install https://github.com/jeighty/supersuit/tree/<branch-name>
 ```
 
 ### Skills not triggering

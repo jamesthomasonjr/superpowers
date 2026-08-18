@@ -1,6 +1,6 @@
 # Workflow configuration
 
-**Supersuit** routes pipeline handoffs through a **resolved workflow map** instead of hard-coded skill directives. Skills emit stable **outcomes**; the map selects the next step (`to`). With no overlays, the bundled map matches the Superpowers pipeline.
+**Supersuit** routes pipeline handoffs through a **resolved workflow map** instead of hard-coded skill directives. Skills emit stable **outcomes**; the map selects the next step (`to`). With no overlays, the bundled map matches the Superpowers pipeline. That is the framework pitch: keep Superpowers methodology by default, then reshape the toolchain when you are ready — Supersuit is not a Superpowers replacement.
 
 Config layers stay under `.superpowers/` so overlays remain familiar; the **plugin id** is `supersuit`.
 
