@@ -26,7 +26,10 @@ Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it h
 ## Workflow map
 
 Superpowers handoffs are owned by a resolved workflow map (bundled defaults,
-optional `~/.superpowers/workflow.yaml`, optional `.superpowers/workflow.yaml`).
+optional `~/.supersuit/workflow.yaml`, optional `.supersuit/workflow.yaml`).
+`.supersuit/` is canonical. Leftover `~/.superpowers/workflow.yaml` and
+`.superpowers/workflow.yaml` still load for one release when the canonical
+file is absent.
 
 When SessionStart did not inject a `<WORKFLOW_MAP>` block, run
 `resolve-workflow` from the plugin (or read its JSON stdout) before the first

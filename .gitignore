@@ -1,6 +1,7 @@
 .worktrees/
 .private-journal/
 .claude/
+.supersuit/
 .superpowers/
 .DS_Store
 node_modules/

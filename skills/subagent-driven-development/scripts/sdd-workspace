@@ -3,15 +3,17 @@
 # short-lived artifacts: task briefs, implementer reports, review packages,
 # and the progress ledger. Print the plan directory's absolute path.
 #
-# One directory per plan (.superpowers/sdd/<plan-basename>/) so a follow-up
+# One directory per plan (.supersuit/sdd/<plan-basename>/) so a follow-up
 # plan in the same working tree can never read or overwrite another plan's
 # artifacts. A stale ledger misread as current progress makes controllers
 # skip whole task sequences — plan-scoping removes that failure structurally.
+# Leftover .superpowers/sdd/<plan-basename>/ still loads for one release when
+# the canonical dir is absent. New workspaces are created under .supersuit/.
 #
 # The workspace lives in the working tree (not under .git/) because Claude Code
 # treats .git/ as a protected path and denies agent writes there — which blocks
 # an implementer subagent from writing its report file. A self-ignoring
-# .gitignore at .superpowers/sdd/ keeps every plan's workspace out of
+# .gitignore at .supersuit/sdd/ keeps every plan's workspace out of
 # `git status` and out of accidental commits without modifying any tracked file.
 #
 # Single source of truth for the workspace location, so task-brief and
@@ -33,7 +35,15 @@ slug=$(basename "$plan" .md)
   || { echo "cannot derive a workspace name from: $plan" >&2; exit 2; }
 
 root=$(git rev-parse --show-toplevel)
-base="$root/.superpowers/sdd"
+canonical_base="$root/.supersuit/sdd"
+legacy_base="$root/.superpowers/sdd"
+if [ -d "$canonical_base/$slug" ]; then
+  base="$canonical_base"
+elif [ -d "$legacy_base/$slug" ]; then
+  base="$legacy_base"
+else
+  base="$canonical_base"
+fi
 dir="$base/$slug"
 mkdir -p "$dir"
 printf '*\n' > "$base/.gitignore"

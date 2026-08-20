@@ -115,4 +115,4 @@ Read existing skills and the [workflow config](docs/workflow-config.md) before c
 - One problem per PR
 - Test on at least one harness (or the relevant automated suite) and report results
 - Describe the problem you solved, not just what you changed
-- Plugin id is `supersuit`. Skill namespace is `supersuit:<skill>`. Config dirs stay `.superpowers/` / `~/.superpowers/`.
+- Plugin id is `supersuit`. Skill namespace is `supersuit:<skill>`. Config dirs are `.supersuit/` / `~/.supersuit/` (`.superpowers/` is a one-release read fallback).

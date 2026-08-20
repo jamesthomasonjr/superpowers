@@ -75,10 +75,10 @@ PLAN
     dir_a="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-a.md)"
     dir_b="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-b.md)"
 
-    if [[ "$dir_a" == "$repo/.superpowers/sdd/plan-a" ]]; then
-        pass "prints <repo-root>/.superpowers/sdd/<plan-basename>"
+    if [[ "$dir_a" == "$repo/.supersuit/sdd/plan-a" ]]; then
+        pass "prints <repo-root>/.supersuit/sdd/<plan-basename>"
     else
-        fail "prints <repo-root>/.superpowers/sdd/<plan-basename>"
+        fail "prints <repo-root>/.supersuit/sdd/<plan-basename>"
         echo "    got: $dir_a"
     fi
 
@@ -90,10 +90,10 @@ PLAN
         echo "    b: $dir_b"
     fi
 
-    if [[ -f "$repo/.superpowers/sdd/.gitignore" && "$(cat "$repo/.superpowers/sdd/.gitignore")" == "*" ]]; then
-        pass "self-ignoring .gitignore created at .superpowers/sdd/ with '*'"
+    if [[ -f "$repo/.supersuit/sdd/.gitignore" && "$(cat "$repo/.supersuit/sdd/.gitignore")" == "*" ]]; then
+        pass "self-ignoring .gitignore created at .supersuit/sdd/ with '*'"
     else
-        fail "self-ignoring .gitignore created at .superpowers/sdd/ with '*'"
+        fail "self-ignoring .gitignore created at .supersuit/sdd/ with '*'"
     fi
 
     printf 'x\n' > "$dir_a/artifact.md"
@@ -101,7 +101,7 @@ PLAN
     status="$(cd "$repo" && git status --porcelain)"
     # plan-a.md/plan-b.md are intentionally untracked fixture files; only the
     # workspace must be invisible.
-    if [[ "$status" != *".superpowers"* ]]; then
+    if [[ "$status" != *".supersuit"* && "$status" != *".superpowers"* ]]; then
         pass "workspace invisible to git status"
     else
         fail "workspace invisible to git status"
@@ -111,7 +111,7 @@ PLAN
     ( cd "$repo" && git add -A )
     local staged
     staged="$(cd "$repo" && git diff --cached --name-only)"
-    if [[ "$staged" != *".superpowers"* ]]; then
+    if [[ "$staged" != *".supersuit"* && "$staged" != *".superpowers"* ]]; then
         pass "git add -A does not stage the workspace"
     else
         fail "git add -A does not stage the workspace"
@@ -122,7 +122,7 @@ PLAN
     local brief_out brief_path
     brief_out="$(cd "$repo" && "$SDD_SCRIPTS/task-brief" plan-a.md 1)"
     brief_path="$(printf '%s\n' "$brief_out" | sed -n 's/^wrote \(.*\): [0-9][0-9]* lines$/\1/p')"
-    if [[ "$brief_path" == "$repo/.superpowers/sdd/plan-a/task-1-brief.md" ]]; then
+    if [[ "$brief_path" == "$repo/.supersuit/sdd/plan-a/task-1-brief.md" ]]; then
         pass "task-brief writes its brief under the plan's workspace"
     else
         fail "task-brief writes its brief under the plan's workspace"
@@ -139,7 +139,7 @@ PLAN
     rp_out="$(cd "$repo" && "$SDD_SCRIPTS/review-package" plan-a.md HEAD~1 HEAD)"
     rp_path="$(printf '%s\n' "$rp_out" | sed -n 's/^wrote \(.*\): [0-9].*$/\1/p')"
     case "$rp_path" in
-        "$repo/.superpowers/sdd/plan-a/review-"*.diff)
+        "$repo/.supersuit/sdd/plan-a/review-"*.diff)
             pass "review-package writes its diff under the plan's workspace" ;;
         *)
             fail "review-package writes its diff under the plan's workspace"
@@ -171,7 +171,7 @@ PLAN
     local wt_root wt_dir
     wt_root="$(cd "$wt" && git rev-parse --show-toplevel)"
     wt_dir="$(cd "$wt" && "$SDD_SCRIPTS/sdd-workspace" plan-a.md)"
-    if [[ "$wt_dir" == "$wt_root/.superpowers/sdd/plan-a" && "$wt_dir" != "$dir_a" ]]; then
+    if [[ "$wt_dir" == "$wt_root/.supersuit/sdd/plan-a" && "$wt_dir" != "$dir_a" ]]; then
         pass "linked worktree resolves its own distinct workspace"
     else
         fail "linked worktree resolves its own distinct workspace"
@@ -182,11 +182,36 @@ PLAN
     printf 'y\n' > "$wt_dir/artifact.md"
     local wt_status
     wt_status="$(cd "$wt" && git status --porcelain)"
-    if [[ "$wt_status" != *".superpowers"* ]]; then
+    if [[ "$wt_status" != *".supersuit"* && "$wt_status" != *".superpowers"* ]]; then
         pass "worktree workspace invisible to git status"
     else
         fail "worktree workspace invisible to git status"
         echo "    status: $wt_status"
+    fi
+
+    # --- leftover .superpowers/sdd/<plan> still loads ---
+    cat > "$repo/plan-legacy.md" <<'PLAN'
+# Plan Legacy
+PLAN
+    mkdir -p "$repo/.superpowers/sdd/plan-legacy"
+    printf 'old-ledger\n' > "$repo/.superpowers/sdd/plan-legacy/progress.md"
+    local dir_legacy
+    dir_legacy="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-legacy.md)"
+    if [[ "$dir_legacy" == "$repo/.superpowers/sdd/plan-legacy" ]]; then
+        pass "loads leftover .superpowers/sdd/<plan> when .supersuit/sdd/<plan> is absent"
+    else
+        fail "loads leftover .superpowers/sdd/<plan> when .supersuit/sdd/<plan> is absent"
+        echo "    got: $dir_legacy"
+    fi
+
+    mkdir -p "$repo/.supersuit/sdd/plan-legacy"
+    printf 'new-ledger\n' > "$repo/.supersuit/sdd/plan-legacy/progress.md"
+    dir_legacy="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-legacy.md)"
+    if [[ "$dir_legacy" == "$repo/.supersuit/sdd/plan-legacy" ]]; then
+        pass "prefers .supersuit/sdd/<plan> when both scratch dirs exist"
+    else
+        fail "prefers .supersuit/sdd/<plan> when both scratch dirs exist"
+        echo "    got: $dir_legacy"
     fi
 
     echo ""
