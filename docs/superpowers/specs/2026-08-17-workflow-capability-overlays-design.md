@@ -109,6 +109,12 @@ SessionStart passes `--detect-capabilities` (currently auto-detects
 `session-inject` when hook env is present) plus any env override into
 `resolve-workflow`.
 
+`run-workflow-action --id` **always** runs the same conservative probe, then
+unions `SUPERPOWERS_CAPABILITIES` and `--capabilities`. The documented
+`--id` invocation cannot drop SessionStart-detected `session-inject`. Forward
+the resolved map's `capabilities` list via `--capabilities` so advertised
+tokens cannot drift.
+
 ## Testing
 
 - Merge appends gated transitions without dropping baseline `from` edges.
@@ -120,6 +126,10 @@ SessionStart passes `--detect-capabilities` (currently auto-detects
 - Ambiguous equally-specific matches fail closed.
 - SessionStart still injects a map; `capabilities` includes `session-inject`
   and does not claim `native-canvas` from Cursor env alone.
+- Two-call: SessionStart-style resolve (`--detect-capabilities`) then
+  `run-workflow-action --id` without `--detect-capabilities` executes the
+  gated script for a gated-only run id and for a gated run with an ungated
+  fallback (does not unknown-id or silently run the fallback).
 
 ## Success criteria
 

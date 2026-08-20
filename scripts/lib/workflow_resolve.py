@@ -474,7 +474,7 @@ def _validate_skill_entry(
         when_value = normalized.get("when")
         if require_when and when_value is None:
             errors.append(
-                f"skills.{skill_id}: when.capabilities is required when when is set"
+                f"skills.{skill_id}: gated skill entry must include when.capabilities"
             )
         else:
             try:
@@ -596,6 +596,29 @@ def validate_workflow(
 
         if to not in (None, "wait") and to not in known_ids:
             errors.append(f"transition to unknown logical id: {to!r}")
+            continue
+
+        if to not in (None, "wait"):
+            has_ungated_target = to in bundled_skills or to in normalized_skills
+            if not has_ungated_target:
+                trans_req = when_sig or frozenset()
+                skill_reqs: list[frozenset[str]] = []
+                for item in normalized_gated:
+                    if item.get("id") != to:
+                        continue
+                    try:
+                        skill_reqs.append(
+                            _when_capability_set(item["entry"].get("when"))
+                            or frozenset()
+                        )
+                    except WorkflowResolveError:
+                        continue
+                if not any(skill_req <= trans_req for skill_req in skill_reqs):
+                    errors.append(
+                        f"transition from={from_id!r} on={on!r} to={to!r} "
+                        "cannot exist under the same capability set as the "
+                        "gated-only target skill"
+                    )
 
     return errors
 
@@ -849,10 +872,16 @@ def _cli_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
     return plugin_root, project_root, user_home
 
 
-def _cli_capabilities(args: argparse.Namespace) -> list[str]:
+def _cli_capabilities(
+    args: argparse.Namespace, *, detect: bool | None = None
+) -> list[str]:
     from_cli = parse_capabilities(getattr(args, "capabilities", None))
     from_env = parse_capabilities(os.environ.get("SUPERPOWERS_CAPABILITIES"))
-    detected = detect_capabilities() if getattr(args, "detect_capabilities", False) else []
+    if detect is None:
+        should_detect = bool(getattr(args, "detect_capabilities", False))
+    else:
+        should_detect = detect
+    detected = detect_capabilities() if should_detect else []
     return merge_capability_sets(detected, from_env, from_cli)
 
 
@@ -868,7 +897,10 @@ def _add_capability_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--detect-capabilities",
         action="store_true",
-        help="Include conservative auto-detected capabilities from the environment",
+        help=(
+            "Include conservative auto-detected capabilities from the environment "
+            "(run-workflow-action always detects; this flag is accepted for compatibility)"
+        ),
     )
 
 
@@ -962,7 +994,10 @@ def run_action_main(argv: list[str] | None = None) -> int:
     _add_capability_arguments(parser)
     args = parser.parse_args(argv)
     plugin_root, project_root, user_home = _cli_paths(args)
-    capabilities = _cli_capabilities(args)
+    # Always re-probe so `run-workflow-action --id` cannot drop SessionStart's
+    # session-inject. Advertised tokens still come from SUPERPOWERS_CAPABILITIES
+    # or --capabilities (forward the injected map's capabilities list).
+    capabilities = _cli_capabilities(args, detect=True)
 
     try:
         result = run_workflow_action(

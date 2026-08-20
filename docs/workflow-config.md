@@ -97,6 +97,13 @@ Notes:
 ./scripts/run-workflow-action --id ensure-worktree --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME"
 ```
 
+`run-workflow-action` **always** re-probes host capabilities (the same conservative detect SessionStart uses). You do not need `--detect-capabilities` on `--id`; `session-inject` cannot drop just because the documented invocation omitted that flag. Advertised tokens still come from `SUPERPOWERS_CAPABILITIES` and `--capabilities` — when the resolved map lists `capabilities`, forward them:
+
+```bash
+./scripts/run-workflow-action --id ensure-worktree --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME" \
+  --capabilities session-inject,exec-hook
+```
+
 The command prints JSON including `outcome` and `exit_code` on **stdout**. Child script stdout/stderr are forwarded to the CLI's stderr so the JSON stays parseable. Use `outcome` as the map's `on` for the next handoff.
 
 ## Capability-aware overlays
@@ -155,9 +162,9 @@ Place `when` on a transition and/or on a `skills.<id>` entry. The bundled `workf
 
 Active capabilities are the union of, in order (first-seen wins for display order):
 
-1. **`--detect-capabilities`** — conservative process probes (see below)
+1. **Detect** — conservative process probes (see below). `resolve-workflow` probes only with `--detect-capabilities`. `run-workflow-action` always probes, so a documented `--id` invoke cannot drop SessionStart's `session-inject`.
 2. **`SUPERPOWERS_CAPABILITIES`** — comma-separated tokens from the environment
-3. **`--capabilities`** — comma-separated CLI tokens
+3. **`--capabilities`** — comma-separated CLI tokens (forward the resolved map's `capabilities` list here)
 
 ```bash
 ./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME" \

@@ -43,8 +43,12 @@ Rules:
    `run`/`exec` → `path` → `skill` alias → same name.
 4. If the registry entry has `run` (or `exec`), do **not** load a skill. Execute
    it with `run-workflow-action --id <id>` (or an equivalent harness exec that
-   uses the same argv/allow rules). Read the JSON `outcome`, then continue the
-   map for `(from=<id>, on=<outcome>)`.
+   uses the same argv/allow rules). The executor always re-probes host
+   capabilities (same conservative detect as SessionStart) and reads
+   `SUPERPOWERS_CAPABILITIES` / `--capabilities`. When the map lists
+   `capabilities`, pass them through: `--capabilities` plus those tokens — so
+   advertised tokens cannot drift off `session-inject`. Read the JSON
+   `outcome`, then continue the map for `(from=<id>, on=<outcome>)`.
 5. `to: null` — no pipeline handoff; continue the session. Description-triggered
    skills (TDD, debugging, verification, etc.) still apply.
 6. `to: wait` — stop and ask your human partner what to do next.

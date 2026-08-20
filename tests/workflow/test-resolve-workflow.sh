@@ -914,6 +914,135 @@ else
   fi
 fi
 
+echo "=== two-call: resolve detect then run-workflow-action --id ==="
+TWO_CALL="$TEST_ROOT/two-call-proj"
+mkdir -p "$TWO_CALL/scripts" "$TWO_CALL/.supersuit"
+cat > "$TWO_CALL/scripts/gated-only.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat > "$TWO_CALL/scripts/fallback.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat > "$TWO_CALL/scripts/gated.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TWO_CALL/scripts/gated-only.sh" "$TWO_CALL/scripts/fallback.sh" "$TWO_CALL/scripts/gated.sh"
+cat > "$TWO_CALL/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  gated-only-run:
+    run:
+      argv:
+        - scripts/gated-only.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - session-inject
+  dual-run:
+    run:
+      argv:
+        - scripts/gated.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - session-inject
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: gated-only-run
+    when:
+      capabilities:
+        - session-inject
+  - from: gated-only-run
+    on: complete
+    to: writing-plans
+    when:
+      capabilities:
+        - session-inject
+  - from: dual-run
+    on: complete
+    to: writing-plans
+    when:
+      capabilities:
+        - session-inject
+EOF
+TWO_CALL_HOME="$TEST_ROOT/two-call-home"
+mkdir -p "$TWO_CALL_HOME/.supersuit"
+cat > "$TWO_CALL_HOME/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  dual-run:
+    run:
+      argv:
+        - scripts/fallback.sh
+      allow:
+        - project
+EOF
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME" --detect-capabilities)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "session-inject" in d["capabilities"]; assert "run" in d["skills"]["gated-only-run"]; assert d["skills"]["dual-run"]["run"]["argv"][0].endswith("gated.sh")'; then
+  pass "two-call resolve with detect publishes gated run ids"
+else
+  fail "two-call resolve with detect publishes gated run ids"
+fi
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/run-workflow-action" --id gated-only-run --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; assert d["argv"][0].endswith("gated-only.sh")'; then
+  pass "two-call gated-only --id executes gated script"
+else
+  fail "two-call gated-only --id executes gated script"
+  echo "$OUT" | sed 's/^/    /'
+fi
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/run-workflow-action" --id dual-run --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; path=d["argv"][0]; assert path.endswith("gated.sh"), path; assert not path.endswith("fallback.sh")'; then
+  pass "two-call gated-with-fallback --id executes gated script"
+else
+  fail "two-call gated-with-fallback --id executes gated script"
+  echo "$OUT" | sed 's/^/    /'
+fi
+
+echo "=== reject ungated transition to gated-only skill ==="
+GATED_ONLY_TO="$TEST_ROOT/gated-only-to-proj"
+mkdir -p "$GATED_ONLY_TO/scripts" "$GATED_ONLY_TO/.supersuit"
+cat > "$GATED_ONLY_TO/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$GATED_ONLY_TO/scripts/ensure-fixture.sh"
+cat > "$GATED_ONLY_TO/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-fixture
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$GATED_ONLY_TO" --user-home "$TEST_HOME" --capabilities exec-hook >/dev/null 2>"$TEST_ROOT/err-gated-to.txt"; then
+  fail "reject ungated transition to gated-only skill"
+else
+  if grep -qi 'same capability set' "$TEST_ROOT/err-gated-to.txt"; then
+    pass "reject ungated transition to gated-only skill"
+  else
+    fail "reject ungated transition to gated-only skill"
+    sed 's/^/    /' "$TEST_ROOT/err-gated-to.txt"
+  fi
+fi
+
 echo "=== reject invalid when clause ==="
 BAD_WHEN="$TEST_ROOT/bad-when-proj"
 mkdir -p "$BAD_WHEN/.supersuit"
