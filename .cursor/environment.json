@@ -1,0 +1,7 @@
+{
+  "name": "Supersuit",
+  "install": "./scripts/bootstrap-cloud-agent-skills.sh",
+  "repositoryDependencies": [
+    "github.com/jamesthomasonjr/skills"
+  ]
+}

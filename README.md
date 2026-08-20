@@ -138,6 +138,14 @@ Same as Codex App: use this repository when you want Supersuit’s workflow map.
 
 Install from this repository (for example via a git-based or local plugin install pointing at [jeighty/supersuit](https://github.com/jeighty/supersuit)). Marketplace `/add-plugin superpowers` may install upstream Superpowers instead of this fork.
 
+#### Cursor Cloud Agents
+
+Cloud Agents run on isolated VMs and do not inherit laptop `~/.cursor/skills` or Cursor plugin installs. They do load skills from `~/.cursor/skills/` on the VM.
+
+This repo's [`.cursor/environment.json`](.cursor/environment.json) clones [jamesthomasonjr/skills](https://github.com/jamesthomasonjr/skills) and runs that repo's Cloud Agent installer during environment setup (including Builds). The installer is idempotent: it checkouts this repo and the promoted skills from `jamesthomasonjr/skills`, then symlinks each `SKILL.md` folder into `~/.cursor/skills`. It does not install `personal/` or `in-progress/`.
+
+This does not replace the Cursor plugin install above for local use. Use the plugin on your laptop; Cloud Agents use the environment installer.
+
 ### Devin CLI
 
 - Install the plugin from this repository:
