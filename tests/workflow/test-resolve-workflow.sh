@@ -555,6 +555,126 @@ else
   sed 's/^/    stderr: /' "$TEST_ROOT/noisy-stderr.txt"
 fi
 
+echo "=== CLI project .supersuit overlay wait ==="
+CANON="$TEST_ROOT/canon-proj"
+mkdir -p "$CANON/.supersuit"
+cat > "$CANON/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+if OUT="$(cd "$CANON" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CANON" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="wait"'; then
+  pass "CLI project .supersuit overlay wait"
+else
+  fail "CLI project .supersuit overlay wait"
+fi
+
+echo "=== CLI prefers .supersuit over .superpowers ==="
+BOTH="$TEST_ROOT/both-proj"
+mkdir -p "$BOTH/.supersuit" "$BOTH/.superpowers"
+cat > "$BOTH/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: writing-plans
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+cat > "$BOTH/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+if OUT="$(cd "$BOTH" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$BOTH" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="wait"'; then
+  pass "CLI prefers .supersuit over .superpowers"
+else
+  fail "CLI prefers .supersuit over .superpowers"
+fi
+
+echo "=== CLI prefers user ~/.supersuit over ~/.superpowers ==="
+USER_BOTH="$TEST_ROOT/user-both-home"
+mkdir -p "$USER_BOTH/.supersuit" "$USER_BOTH/.superpowers"
+cat > "$USER_BOTH/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: writing-plans
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+cat > "$USER_BOTH/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+EMPTY_PROJ="$TEST_ROOT/empty-for-user"
+mkdir -p "$EMPTY_PROJ"
+if OUT="$(cd "$EMPTY_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$EMPTY_PROJ" --user-home "$USER_BOTH")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="wait"'; then
+  pass "CLI prefers user ~/.supersuit over ~/.superpowers"
+else
+  fail "CLI prefers user ~/.supersuit over ~/.superpowers"
+fi
+
+echo "=== CLI still reads user ~/.superpowers fallback ==="
+USER_LEGACY="$TEST_ROOT/user-legacy-home"
+mkdir -p "$USER_LEGACY/.superpowers"
+cat > "$USER_LEGACY/.superpowers/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+  - from: brainstorming
+    on: approved-bounded
+    to: null
+  - from: brainstorming
+    on: approved-spike
+    to: null
+EOF
+if OUT="$(cd "$EMPTY_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$EMPTY_PROJ" --user-home "$USER_LEGACY")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="wait"'; then
+  pass "CLI still reads user ~/.superpowers fallback"
+else
+  fail "CLI still reads user ~/.superpowers fallback"
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1

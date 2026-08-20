@@ -24,7 +24,7 @@ The manifest does three things:
 2. Loads `using-superpowers` at session start through `sessionStart.skill`.
 3. Provides Kimi-specific tool mapping through `skillInstructions`.
 
-Kimi Code reads skills from this repository. There are no copied skills, symlinks, hooks, or extra runtime dependencies. Pipeline handoffs use Supersuit's workflow map; paths remain under `.superpowers/`. See [workflow-config.md](workflow-config.md).
+Kimi Code reads skills from this repository. There are no copied skills, symlinks, hooks, or extra runtime dependencies. Pipeline handoffs use Supersuit's workflow map; config lives under `.supersuit/` (leftover `.superpowers/` still loads for one release). See [workflow-config.md](workflow-config.md).
 
 ## Tool Mapping
 

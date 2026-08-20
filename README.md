@@ -31,6 +31,7 @@ With no overrides, behavior matches Superpowers. Add a user or project workflow 
   - [OpenCode](#opencode)
   - [Pi](#pi)
   - [Hermes Agent](#hermes-agent)
+- [Migrating from Superpowers](#migrating-from-superpowers)
 - [The Basic Workflow](#the-basic-workflow)
 - [Customizing the workflow](#customizing-the-workflow)
 - [Upstream & community](#upstream--community)
@@ -48,7 +49,7 @@ Supersuit keeps Superpowers’ methodology — brainstorm before coding, plan in
 - Skills emit stable **outcomes** instead of hard-coding the next skill.
 - A **workflow map** decides what runs next (`to: <skill>`, `null`, or `wait`).
 - You can **alias or path-override** individual skills by logical id.
-- Config layers: bundled defaults → `~/.superpowers/workflow.yaml` → `.superpowers/workflow.yaml`.
+- Config layers: bundled defaults → `~/.supersuit/workflow.yaml` → `.supersuit/workflow.yaml`. Leftover `~/.superpowers/` / `.superpowers/` still load for one release when the canonical file is absent.
 
 Use Superpowers when you want the maintained upstream product. Use Supersuit when you want that methodology as a base and need to shape the toolchain yourself.
 
@@ -65,7 +66,7 @@ Keeping the install id as `superpowers` while shipping a fork is confusing for u
 | Positioning | **Framework, not replacement** | Evolve your workflow after Superpowers; do not displace the upstream product |
 | Skill namespace | **`supersuit:<skill>`** | Matches plugin id (e.g. `supersuit:brainstorming`) |
 | Bootstrap skill folder | `using-superpowers` | Still teaches the Superpowers methodology; invoked as `supersuit:using-superpowers` |
-| Config dirs | **`.superpowers/`** / `~/.superpowers/` | Workflow overlays stay compatible with the design already documented; no forced migration |
+| Config dirs | **`.supersuit/`** / `~/.supersuit/` | Canonical control plane. Leftover `.superpowers/` / `~/.superpowers/` still load for one release |
 | Env telemetry flag | `SUPERPOWERS_DISABLE_TELEMETRY` | Inherited from upstream; logo `?v=` is tagged `+supersuit` when enabled |
 
 **Do not enable upstream Superpowers and Supersuit in the same harness profile.** They overlap in skills and will fight over triggers.
@@ -85,6 +86,8 @@ Supersuit is a **derivative framework**, not a competitor or drop-in substitute 
 
 Contributing the configurable graph **upstream is preferred** when it fits. This fork exists because workflow customization is explicitly outside Superpowers’ acceptance criteria today. See the [design spec](docs/superpowers/specs/2026-08-16-configurable-workflow-graph-design.md).
 
+If you already run Superpowers, this is a **one-time migration**, not a drop-in swap. Official marketplace `superpowers` still installs upstream. See [Migrating from Superpowers](#migrating-from-superpowers).
+
 ## How it works
 
 It starts from the moment you fire up your coding agent. As soon as it sees that you're building something, it *doesn't* just jump into trying to write code. Instead, it steps back and asks you what you're really trying to do.
@@ -102,6 +105,8 @@ There's a bunch more to it, but that's the core of the system. And because the s
 Installation differs by harness. If you use more than one, install Supersuit separately for each one.
 
 Official marketplaces often still ship **upstream** Superpowers. To get **this** fork (configurable workflow map), install from this repository as shown below.
+
+Coming from Superpowers? Uninstall it first, then follow [Migrating from Superpowers](#migrating-from-superpowers). Do not enable both plugins in one harness.
 
 ### Claude Code
 
@@ -248,6 +253,10 @@ Restart any active Hermes sessions after installing. Note: Hermes has no
 post-compaction hook, so a very long session that compacts over its first
 turn loses the bootstrap — start a fresh session if skills stop triggering.
 
+## Migrating from Superpowers
+
+Supersuit is not a drop-in for Superpowers. Uninstall Superpowers, install this fork (commands above), rewrite `superpowers:` invocations to `supersuit:`, and move leftover overlays to `.supersuit/`. Full steps, script flags, and what will / will not change: [docs/migrating-from-superpowers.md](docs/migrating-from-superpowers.md).
+
 ## The Basic Workflow
 
 1. **brainstorming** - Activates before writing code. Refines rough ideas through questions, explores alternatives, presents design in sections for validation. Saves design document.
@@ -272,8 +281,8 @@ No config required for stock Superpowers behavior.
 
 To rewire handoffs or replace a skill, add:
 
-- User defaults: `~/.superpowers/workflow.yaml`
-- Per-project: `.superpowers/workflow.yaml`
+- User defaults: `~/.supersuit/workflow.yaml` (fallback `~/.superpowers/workflow.yaml`)
+- Per-project: `.supersuit/workflow.yaml` (fallback `.superpowers/workflow.yaml`)
 
 Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
 
@@ -324,6 +333,7 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 - **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
 - **`scripts/resolve-workflow`** - Merge and validate overlays
 - **`scripts/run-workflow-action`** - Execute a deterministic `run`/`exec` registry entry
+- **`scripts/migrate-to-supersuit`** - One-time Superpowers → Supersuit rewrite + dir move
 
 ## Philosophy
 

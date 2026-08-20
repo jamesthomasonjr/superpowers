@@ -14,7 +14,7 @@ export XDG_CONFIG_HOME="$TEST_HOME/.config"
 export OPENCODE_CONFIG_DIR="$TEST_HOME/.config/opencode"
 
 # Standard install layout (package id supersuit; skills still live under
-# the inherited using-superpowers / .superpowers/ contracts):
+# the inherited using-superpowers / .supersuit/ contracts):
 #   $OPENCODE_CONFIG_DIR/supersuit/             ← package root
 #   $OPENCODE_CONFIG_DIR/supersuit/skills/      ← skills dir (../../skills from plugin)
 #   $OPENCODE_CONFIG_DIR/supersuit/.opencode/plugins/supersuit.js ← plugin file

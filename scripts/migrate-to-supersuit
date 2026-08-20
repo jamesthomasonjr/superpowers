@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# migrate-to-supersuit — one-time Superpowers → Supersuit helper.
+#
+# Rewrites the skill-namespace prefix superpowers: → supersuit: and moves
+# leftover .superpowers/ overlay/scratch dirs to .supersuit/.
+# Dry-run by default. Use --write to apply.
+#
+# Usage:
+#   migrate-to-supersuit [-n|--dry-run] [--write] [--user] [PATH...]
+#
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$SCRIPT_DIR/lib/migrate_to_supersuit.py" "$@"

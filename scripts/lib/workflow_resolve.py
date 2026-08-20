@@ -20,6 +20,19 @@ class WorkflowResolveError(Exception):
     """Raised when workflow configuration cannot be resolved."""
 
 
+CANONICAL_CONFIG_DIR = ".supersuit"
+LEGACY_CONFIG_DIR = ".superpowers"
+
+
+def overlay_workflow_path(root: Path) -> Path | None:
+    """Return workflow.yaml under root, preferring .supersuit/ over .superpowers/."""
+    for dirname in (CANONICAL_CONFIG_DIR, LEGACY_CONFIG_DIR):
+        candidate = root / dirname / "workflow.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def discover_known_skills(plugin_root: Path) -> list[str]:
     """Return bundled skill directory names that contain SKILL.md."""
     skills_dir = plugin_root / "skills"
@@ -369,8 +382,8 @@ def resolve_workflow(
         raise WorkflowResolveError("bundled workflow must be a mapping")
 
     if not bundled_only:
-        user_path = user_home / ".superpowers" / "workflow.yaml"
-        if user_path.is_file():
+        user_path = overlay_workflow_path(user_home)
+        if user_path is not None:
             try:
                 user_doc = load_yaml(user_path.read_text())
             except OSError as exc:
@@ -387,8 +400,8 @@ def resolve_workflow(
                 )
             merged = merge_workflows(merged, user_doc)
 
-        project_path = project_root / ".superpowers" / "workflow.yaml"
-        if project_path.is_file():
+        project_path = overlay_workflow_path(project_root)
+        if project_path is not None:
             try:
                 project_doc = load_yaml(project_path.read_text())
             except OSError as exc:
@@ -505,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--user-home",
-        help="User home for ~/.superpowers/workflow.yaml (default: HOME)",
+        help="User home for ~/.supersuit/workflow.yaml (fallback ~/.superpowers/; default: HOME)",
     )
     parser.add_argument(
         "--pretty",

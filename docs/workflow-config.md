@@ -2,7 +2,7 @@
 
 **Supersuit** routes pipeline handoffs through a **resolved workflow map** instead of hard-coded skill directives. Skills emit stable **outcomes**; the map selects the next step (`to`). With no overlays, the bundled map matches the Superpowers pipeline. That is the framework pitch: keep Superpowers methodology by default, then reshape the toolchain when you are ready — Supersuit is not a Superpowers replacement.
 
-Config layers stay under `.superpowers/` so overlays remain familiar; the **plugin id** is `supersuit`.
+Config layers live under **`.supersuit/`** (canonical). Leftover `.superpowers/` still loads for one release when the canonical file is absent. The **plugin id** is `supersuit`.
 
 **Design specs:**
 - [Configurable workflow graph](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
@@ -13,8 +13,10 @@ Config layers stay under `.superpowers/` so overlays remain familiar; the **plug
 Configs merge in order (lowest → highest precedence):
 
 1. **Bundled defaults** — `workflows/default.yaml` in the plugin
-2. **User overlay** — `~/.superpowers/workflow.yaml`
-3. **Project overlay** — `.superpowers/workflow.yaml` in the project root
+2. **User overlay** — `~/.supersuit/workflow.yaml`, or `~/.superpowers/workflow.yaml` if the canonical file is absent
+3. **Project overlay** — `.supersuit/workflow.yaml` in the project root, or `.superpowers/workflow.yaml` if the canonical file is absent
+
+`.supersuit/` is the long-term name. `.superpowers/` is a compatibility fallback, not a second overlay layer: each of user and project picks **one** file (canonical wins). New writes go to `.supersuit/`. See [Migrating from Superpowers](migrating-from-superpowers.md).
 
 Later layers override earlier ones:
 
@@ -98,7 +100,7 @@ The command prints JSON including `outcome` and `exit_code` on **stdout**. Child
 
 ## Example: replace brainstorming with a custom skill path
 
-Project file `.superpowers/workflow.yaml`:
+Project file `.supersuit/workflow.yaml`:
 
 ```yaml
 version: 1
@@ -133,7 +135,7 @@ Replace-by-`from` means you must list **all** outcomes for `brainstorming` you w
 
 ## Example: clear a user override back to bundled identity
 
-If `~/.superpowers/workflow.yaml` remaps brainstorming but this project should use the bundled skill:
+If `~/.supersuit/workflow.yaml` remaps brainstorming but this project should use the bundled skill:
 
 ```yaml
 version: 1

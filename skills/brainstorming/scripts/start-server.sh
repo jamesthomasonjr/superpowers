@@ -6,8 +6,11 @@
 # Each session gets its own directory to avoid conflicts.
 #
 # Options:
-#   --project-dir <path>  Store session files under <path>/.superpowers/brainstorm/
+#   --project-dir <path>  Store session files under <path>/.supersuit/brainstorm/
 #                         instead of /tmp. Files persist after server stops.
+#                         Leftover .superpowers/brainstorm/.last-port and
+#                         .last-token are copied forward when the canonical
+#                         files are absent.
 #   --host <bind-host>    Host/interface to bind (default: 127.0.0.1).
 #                         Use 0.0.0.0 in remote/containerized environments.
 #   --url-host <host>     Hostname shown in returned URL JSON.
@@ -114,11 +117,20 @@ umask 077
 SESSION_ID="$$-$(date +%s)"
 
 if [[ -n "$PROJECT_DIR" ]]; then
-  SESSION_DIR="${PROJECT_DIR}/.superpowers/brainstorm/${SESSION_ID}"
+  BRAINSTORM_ROOT="${PROJECT_DIR}/.supersuit/brainstorm"
+  LEGACY_BRAINSTORM_ROOT="${PROJECT_DIR}/.superpowers/brainstorm"
+  mkdir -p "$BRAINSTORM_ROOT"
+  if [[ ! -e "${BRAINSTORM_ROOT}/.last-port" && -f "${LEGACY_BRAINSTORM_ROOT}/.last-port" ]]; then
+    cp -p "${LEGACY_BRAINSTORM_ROOT}/.last-port" "${BRAINSTORM_ROOT}/.last-port"
+  fi
+  if [[ ! -e "${BRAINSTORM_ROOT}/.last-token" && -f "${LEGACY_BRAINSTORM_ROOT}/.last-token" ]]; then
+    cp -p "${LEGACY_BRAINSTORM_ROOT}/.last-token" "${BRAINSTORM_ROOT}/.last-token"
+  fi
+  SESSION_DIR="${BRAINSTORM_ROOT}/${SESSION_ID}"
   # Persist the bound port and key per project so a restart reuses them and an
   # already-open browser tab reconnects to the same URL with a valid cookie.
-  export BRAINSTORM_PORT_FILE="${PROJECT_DIR}/.superpowers/brainstorm/.last-port"
-  export BRAINSTORM_TOKEN_FILE="${PROJECT_DIR}/.superpowers/brainstorm/.last-token"
+  export BRAINSTORM_PORT_FILE="${BRAINSTORM_ROOT}/.last-port"
+  export BRAINSTORM_TOKEN_FILE="${BRAINSTORM_ROOT}/.last-token"
 else
   SESSION_DIR="/tmp/brainstorm-${SESSION_ID}"
 fi
