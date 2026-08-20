@@ -226,8 +226,8 @@ echo "SessionStart workflow map injection tests"
 assert_command_output \
     "Cursor injects WORKFLOW_MAP with resolved transitions" \
     "cursor" \
-    "WORKFLOW_MAP"$'\037'"approved-architectural" \
-    "" \
+    "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject" \
+    "native-canvas" \
     "$cursor_home" \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \

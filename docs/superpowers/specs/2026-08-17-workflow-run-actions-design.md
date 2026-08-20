@@ -88,7 +88,7 @@ transitions:
 ## Resolution and agent rules
 
 1. Logical id lookup order becomes: **`run`/`exec` → `path` → `skill` alias → same-name skill**.
-2. When `to` points at a run id, the agent/harness **must not** invent a skill invoke. It should run `scripts/run-workflow-action --id <id>` (or an equivalent harness exec hook that uses the same argv/allow rules), read the printed outcome, then follow the map for `(from=<id>, on=<outcome>)`.
+2. When `to` points at a run id, the agent/harness **must not** invent a skill invoke. It should run `scripts/run-workflow-action --id <id>` (or an equivalent harness exec hook that uses the same argv/allow rules), read the printed outcome, then follow the map for `(from=<id>, on=<outcome>)`. The executor always re-probes host capabilities (same conservative detect as SessionStart) and reads `SUPERPOWERS_CAPABILITIES` / `--capabilities`, so a documented `--id` invoke cannot drop `session-inject`.
 3. SessionStart / `<WORKFLOW_MAP>` text documents run semantics alongside `null` / `wait`.
 
 ## Components

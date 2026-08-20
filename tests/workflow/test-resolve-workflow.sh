@@ -675,6 +675,397 @@ else
   fail "CLI still reads user ~/.superpowers fallback"
 fi
 
+echo "=== default.yaml has no capability gates ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_yaml import load_yaml
+doc = load_yaml((Path(sys.argv[1]) / "workflows" / "default.yaml").read_text())
+for skill_id, entry in (doc.get("skills") or {}).items():
+    assert isinstance(entry, dict)
+    assert "when" not in entry, skill_id
+for transition in doc.get("transitions") or []:
+    assert "when" not in transition, transition
+print("ok")
+PY
+then
+  pass "default.yaml has no capability gates"
+else
+  fail "default.yaml has no capability gates"
+fi
+
+echo "=== gated overlay transitions append without replace-by-from ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import merge_workflows
+
+base = {
+  "version": 1,
+  "skills": {},
+  "entries": {},
+  "transitions": [
+    {"from": "brainstorming", "on": "approved-architectural", "to": "writing-plans"},
+    {"from": "brainstorming", "on": "approved-bounded", "to": None},
+  ],
+}
+overlay = {
+  "transitions": [
+    {
+      "from": "brainstorming",
+      "on": "approved-architectural",
+      "to": "ensure-fixture",
+      "when": {"capabilities": ["exec-hook"]},
+    }
+  ]
+}
+merged = merge_workflows(base, overlay)
+froms = [t for t in merged["transitions"] if t["from"] == "brainstorming"]
+assert len(froms) == 3, froms
+assert any(t.get("when") for t in froms)
+assert any(t["on"] == "approved-bounded" for t in froms)
+assert any(
+    t["on"] == "approved-architectural" and t["to"] == "writing-plans" and "when" not in t
+    for t in froms
+)
+print("ok")
+PY
+then
+  pass "gated overlay transitions append without replace-by-from"
+else
+  fail "gated overlay transitions append without replace-by-from"
+fi
+
+echo "=== capability match / miss / missing-capability-probe ==="
+CAP_PROJ="$TEST_ROOT/cap-proj"
+mkdir -p "$CAP_PROJ/scripts" "$CAP_PROJ/.supersuit"
+cat > "$CAP_PROJ/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$CAP_PROJ/scripts/ensure-fixture.sh"
+cat > "$CAP_PROJ/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-fixture
+    when:
+      capabilities:
+        - exec-hook
+EOF
+
+if OUT="$(cd "$CAP_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CAP_PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert d.get("capabilities") == []
+t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]
+assert t["to"]=="writing-plans"
+assert "when" not in t
+assert "ensure-fixture" not in d["skills"] or "run" not in d["skills"].get("ensure-fixture", {})
+'; then
+  pass "capability miss keeps baseline edge"
+else
+  fail "capability miss keeps baseline edge"
+fi
+
+if OUT="$(cd "$CAP_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CAP_PROJ" --user-home "$TEST_HOME" --capabilities exec-hook)" &&
+  echo "$OUT" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert "exec-hook" in d["capabilities"]
+t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]
+assert t["to"]=="ensure-fixture"
+assert "when" not in t
+assert "run" in d["skills"]["ensure-fixture"]
+assert "when" not in d["skills"]["ensure-fixture"]
+'; then
+  pass "capability match selects gated edge"
+else
+  fail "capability match selects gated edge"
+fi
+
+if OUT="$(cd "$CAP_PROJ" && env -u SUPERPOWERS_CAPABILITIES -u CURSOR_PLUGIN_ROOT -u CLAUDE_PLUGIN_ROOT -u COPILOT_CLI "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CAP_PROJ" --user-home "$TEST_HOME" --detect-capabilities)" &&
+  echo "$OUT" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert d.get("capabilities") == []
+for cap in ("native-worktree", "subagents", "exec-hook", "native-canvas", "session-inject"):
+    assert cap not in d.get("capabilities", [])
+t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]
+assert t["to"]=="writing-plans"
+'; then
+  pass "missing-capability-probe keeps baseline"
+else
+  fail "missing-capability-probe keeps baseline"
+fi
+
+echo "=== detect-capabilities claims session-inject only from hook env ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts" / "lib"))
+from workflow_resolve import detect_capabilities
+
+assert detect_capabilities({}) == []
+assert detect_capabilities({"CURSOR_PLUGIN_ROOT": "/tmp"}) == ["session-inject"]
+assert detect_capabilities({"CLAUDE_PLUGIN_ROOT": "/tmp"}) == ["session-inject"]
+assert detect_capabilities({"COPILOT_CLI": "1"}) == ["session-inject"]
+claimed = detect_capabilities({"CURSOR_PLUGIN_ROOT": "/tmp", "TERM": "xterm"})
+assert claimed == ["session-inject"]
+assert "native-canvas" not in claimed
+assert "native-worktree" not in claimed
+assert "subagents" not in claimed
+assert "exec-hook" not in claimed
+print("ok")
+PY
+then
+  pass "detect-capabilities claims session-inject only from hook env"
+else
+  fail "detect-capabilities claims session-inject only from hook env"
+fi
+
+if OUT="$(cd "$CAP_PROJ" && CURSOR_PLUGIN_ROOT=/tmp "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CAP_PROJ" --user-home "$TEST_HOME" --detect-capabilities --bundled-only)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["capabilities"]==["session-inject"]'; then
+  pass "CLI --detect-capabilities adds session-inject"
+else
+  fail "CLI --detect-capabilities adds session-inject"
+fi
+
+echo "=== SUPERPOWERS_CAPABILITIES env selects gated edge ==="
+if OUT="$(cd "$CAP_PROJ" && SUPERPOWERS_CAPABILITIES=exec-hook "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$CAP_PROJ" --user-home "$TEST_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=[x for x in d["transitions"] if x["from"]=="brainstorming" and x["on"]=="approved-architectural"][0]; assert t["to"]=="ensure-fixture"'; then
+  pass "SUPERPOWERS_CAPABILITIES env selects gated edge"
+else
+  fail "SUPERPOWERS_CAPABILITIES env selects gated edge"
+fi
+
+echo "=== gated skill keeps lower-layer remap when capability misses ==="
+SKILL_PROJ="$TEST_ROOT/gated-skill-proj"
+mkdir -p "$SKILL_PROJ/.supersuit" "$TEST_ROOT/gated-skill-home/.supersuit"
+cat > "$TEST_ROOT/gated-skill-home/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  brainstorming:
+    skill: my-brainstorm
+EOF
+cat > "$SKILL_PROJ/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  brainstorming:
+    skill: canvas-brainstorm
+    when:
+      capabilities:
+        - native-canvas
+EOF
+if OUT="$(cd "$SKILL_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$SKILL_PROJ" --user-home "$TEST_ROOT/gated-skill-home")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["skills"]["brainstorming"]["skill"]=="my-brainstorm"'; then
+  pass "gated skill miss keeps lower-layer remap"
+else
+  fail "gated skill miss keeps lower-layer remap"
+fi
+if OUT="$(cd "$SKILL_PROJ" && "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$SKILL_PROJ" --user-home "$TEST_ROOT/gated-skill-home" --capabilities native-canvas)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["skills"]["brainstorming"]["skill"]=="canvas-brainstorm"; assert "when" not in d["skills"]["brainstorming"]'; then
+  pass "gated skill match replaces remap"
+else
+  fail "gated skill match replaces remap"
+fi
+
+echo "=== ambiguous equally-specific transitions fail ==="
+AMBIG="$TEST_ROOT/ambig-proj"
+mkdir -p "$AMBIG/.supersuit"
+cat > "$AMBIG/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+    when:
+      capabilities:
+        - exec-hook
+  - from: brainstorming
+    on: approved-architectural
+    to: writing-plans
+    when:
+      capabilities:
+        - native-worktree
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$AMBIG" --user-home "$TEST_HOME" --capabilities exec-hook,native-worktree >/dev/null 2>"$TEST_ROOT/err-ambig.txt"; then
+  fail "ambiguous equally-specific transitions fail"
+else
+  if grep -qi 'ambiguous' "$TEST_ROOT/err-ambig.txt"; then
+    pass "ambiguous equally-specific transitions fail"
+  else
+    fail "ambiguous equally-specific transitions fail"
+    sed 's/^/    /' "$TEST_ROOT/err-ambig.txt"
+  fi
+fi
+
+echo "=== two-call: resolve detect then run-workflow-action --id ==="
+TWO_CALL="$TEST_ROOT/two-call-proj"
+mkdir -p "$TWO_CALL/scripts" "$TWO_CALL/.supersuit"
+cat > "$TWO_CALL/scripts/gated-only.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat > "$TWO_CALL/scripts/fallback.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat > "$TWO_CALL/scripts/gated.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TWO_CALL/scripts/gated-only.sh" "$TWO_CALL/scripts/fallback.sh" "$TWO_CALL/scripts/gated.sh"
+cat > "$TWO_CALL/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  gated-only-run:
+    run:
+      argv:
+        - scripts/gated-only.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - session-inject
+  dual-run:
+    run:
+      argv:
+        - scripts/gated.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - session-inject
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: gated-only-run
+    when:
+      capabilities:
+        - session-inject
+  - from: gated-only-run
+    on: complete
+    to: writing-plans
+    when:
+      capabilities:
+        - session-inject
+  - from: dual-run
+    on: complete
+    to: writing-plans
+    when:
+      capabilities:
+        - session-inject
+EOF
+TWO_CALL_HOME="$TEST_ROOT/two-call-home"
+mkdir -p "$TWO_CALL_HOME/.supersuit"
+cat > "$TWO_CALL_HOME/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  dual-run:
+    run:
+      argv:
+        - scripts/fallback.sh
+      allow:
+        - project
+EOF
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME" --detect-capabilities)" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "session-inject" in d["capabilities"]; assert "run" in d["skills"]["gated-only-run"]; assert d["skills"]["dual-run"]["run"]["argv"][0].endswith("gated.sh")'; then
+  pass "two-call resolve with detect publishes gated run ids"
+else
+  fail "two-call resolve with detect publishes gated run ids"
+fi
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/run-workflow-action" --id gated-only-run --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; assert d["argv"][0].endswith("gated-only.sh")'; then
+  pass "two-call gated-only --id executes gated script"
+else
+  fail "two-call gated-only --id executes gated script"
+  echo "$OUT" | sed 's/^/    /'
+fi
+
+if OUT="$(cd "$TWO_CALL" && env -u SUPERPOWERS_CAPABILITIES CURSOR_PLUGIN_ROOT="$REPO_ROOT" "$REPO_ROOT/scripts/run-workflow-action" --id dual-run --plugin-root "$REPO_ROOT" --project-root "$TWO_CALL" --user-home "$TWO_CALL_HOME")" &&
+  echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["outcome"]=="complete"; path=d["argv"][0]; assert path.endswith("gated.sh"), path; assert not path.endswith("fallback.sh")'; then
+  pass "two-call gated-with-fallback --id executes gated script"
+else
+  fail "two-call gated-with-fallback --id executes gated script"
+  echo "$OUT" | sed 's/^/    /'
+fi
+
+echo "=== reject ungated transition to gated-only skill ==="
+GATED_ONLY_TO="$TEST_ROOT/gated-only-to-proj"
+mkdir -p "$GATED_ONLY_TO/scripts" "$GATED_ONLY_TO/.supersuit"
+cat > "$GATED_ONLY_TO/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$GATED_ONLY_TO/scripts/ensure-fixture.sh"
+cat > "$GATED_ONLY_TO/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+skills:
+  ensure-fixture:
+    run:
+      argv:
+        - scripts/ensure-fixture.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-fixture
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$GATED_ONLY_TO" --user-home "$TEST_HOME" --capabilities exec-hook >/dev/null 2>"$TEST_ROOT/err-gated-to.txt"; then
+  fail "reject ungated transition to gated-only skill"
+else
+  if grep -qi 'same capability set' "$TEST_ROOT/err-gated-to.txt"; then
+    pass "reject ungated transition to gated-only skill"
+  else
+    fail "reject ungated transition to gated-only skill"
+    sed 's/^/    /' "$TEST_ROOT/err-gated-to.txt"
+  fi
+fi
+
+echo "=== reject invalid when clause ==="
+BAD_WHEN="$TEST_ROOT/bad-when-proj"
+mkdir -p "$BAD_WHEN/.supersuit"
+cat > "$BAD_WHEN/.supersuit/workflow.yaml" <<'EOF'
+version: 1
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: wait
+    when:
+      harness: cursor
+EOF
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$BAD_WHEN" --user-home "$TEST_HOME" >/dev/null 2>"$TEST_ROOT/err-when.txt"; then
+  fail "reject invalid when clause"
+else
+  if grep -qi 'when' "$TEST_ROOT/err-when.txt"; then
+    pass "reject invalid when clause"
+  else
+    fail "reject invalid when clause"
+    sed 's/^/    /' "$TEST_ROOT/err-when.txt"
+  fi
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
   echo "FAILED: $FAILURES"
   exit 1
