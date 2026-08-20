@@ -24,8 +24,10 @@
 #   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO --bootstrap
 #
 # Destination: a remote run requires CODEX_PLUGINS_FORK or --fork OWNER/REPO.
-# There is no default dest repo. The dest must already exist; --bootstrap only
-# creates plugins/supersuit/ inside that dest, it does not create the dest repo.
+# --local PATH is enough for dry-run (`-n`) and no-op apply. A real apply that
+# commits, pushes, or opens a PR still requires that dest. There is no default
+# dest repo. The dest must already exist; --bootstrap only creates
+# plugins/supersuit/ inside that dest, it does not create the dest repo.
 #
 # Bootstrap mode: skips the "plugin must exist on base" requirement and creates
 # plugins/supersuit/ when absent, then copies the tracked plugin files from
@@ -183,8 +185,14 @@ done
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-if [[ -z "$LOCAL_CHECKOUT" && -z "$FORK" ]]; then
-  die "destination repo required: set CODEX_PLUGINS_FORK or pass --fork OWNER/REPO. The dest repo must already exist (use --bootstrap only after that dest exists)."
+require_dest_repo() {
+  if [[ -z "$FORK" ]]; then
+    die "destination repo required: set CODEX_PLUGINS_FORK or pass --fork OWNER/REPO. The dest repo must already exist (use --bootstrap only after that dest exists)."
+  fi
+}
+
+if [[ -z "$LOCAL_CHECKOUT" ]]; then
+  require_dest_repo
 fi
 
 command -v rsync >/dev/null   || die "rsync not found in PATH"
@@ -420,6 +428,10 @@ if [[ -n "$LOCAL_CHECKOUT" ]]; then
     exit 0
   fi
 fi
+
+# Real apply commits, pushes, and opens a PR against FORK. Require dest
+# before mutating the checkout. --local dry-run and no-op apply may omit it.
+require_dest_repo
 
 prepare_apply_checkout
 cd "$DEST_REPO"

@@ -517,6 +517,15 @@ run_apply() {
     PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" "$upstream/scripts/sync-to-codex-plugin.sh" -y --local "$dest" 2>&1
 }
 
+run_local_apply_without_fork() {
+    local upstream="$1"
+    local dest="$2"
+    local fake_bin="$3"
+
+    env -u CODEX_PLUGINS_FORK PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -y --local "$dest" 2>&1
+}
+
 run_help() {
     local upstream="$1"
     local fake_bin="$2"
@@ -620,6 +629,12 @@ main() {
     local uncloneable_output
     local uncloneable_log
     local uncloneable_fork
+    local apply_missing_fork_dest
+    local apply_missing_fork_dest_branch
+    local apply_missing_fork_head
+    local apply_missing_fork_status
+    local apply_missing_fork_output
+    local apply_missing_fork_log
 
     echo "=== Test: sync-to-codex-plugin dry-run regression ==="
 
@@ -671,6 +686,13 @@ main() {
     write_bootstrap_destination_fixture "$bootstrap_dest"
     checkout_fixture_branch "$bootstrap_dest" "$bootstrap_dest_branch"
 
+    apply_missing_fork_dest="$TEST_ROOT/apply-missing-fork-destination"
+    apply_missing_fork_dest_branch="fixture/apply-missing-fork-target"
+    init_repo "$apply_missing_fork_dest"
+    write_destination_fixture "$apply_missing_fork_dest"
+    checkout_fixture_branch "$apply_missing_fork_dest" "$apply_missing_fork_dest_branch"
+    apply_missing_fork_head="$(git -C "$apply_missing_fork_dest" rev-parse HEAD)"
+
     write_fake_gh "$fake_bin"
 
     # This regression test is about dry-run content, so capture the preview
@@ -700,6 +722,10 @@ main() {
     uncloneable_output="$(run_non_local_preview_with_fork_env "$upstream" "$dest_fake_bin" "$uncloneable_fork")"
     uncloneable_status=$?
     uncloneable_log="$(cat "$dest_gh_log")"
+    : > "$dest_gh_log"
+    apply_missing_fork_output="$(run_local_apply_without_fork "$upstream" "$apply_missing_fork_dest" "$dest_fake_bin")"
+    apply_missing_fork_status=$?
+    apply_missing_fork_log="$(cat "$dest_gh_log")"
     missing_manifest_output="$(run_preview_without_manifest "$upstream" "$dest" "$fake_bin")"
     missing_manifest_status=$?
     set -e
@@ -801,6 +827,17 @@ Locally modified fixture content." "Dirty local apply preserves tracked working-
     assert_contains "$uncloneable_output" "must already exist" "Uncloneable dest says dest repo must already exist"
     assert_not_contains "$uncloneable_output" "Cloning " "Uncloneable dest fails before clone"
     assert_not_contains "$uncloneable_log" "repo clone" "Uncloneable dest does not invoke gh repo clone"
+    assert_equals "$apply_missing_fork_status" "1" "Local apply without dest exits with failure"
+    assert_contains "$apply_missing_fork_output" "CODEX_PLUGINS_FORK" "Local apply without dest names CODEX_PLUGINS_FORK"
+    assert_contains "$apply_missing_fork_output" "--fork" "Local apply without dest names --fork"
+    assert_contains "$apply_missing_fork_output" "must already exist" "Local apply without dest says dest repo must already exist"
+    assert_not_contains "$apply_missing_fork_output" "Pushing " "Local apply without dest fails before push"
+    assert_not_contains "$apply_missing_fork_output" "Opening PR..." "Local apply without dest fails before pr-create"
+    assert_not_contains "$apply_missing_fork_log" "pr create" "Local apply without dest does not invoke gh pr create"
+    assert_equals "$(git -C "$apply_missing_fork_dest" rev-parse HEAD)" "$apply_missing_fork_head" "Local apply without dest does not create a commit"
+    assert_current_branch "$apply_missing_fork_dest" "$apply_missing_fork_dest_branch" "Local apply without dest leaves destination checkout on its original branch"
+    assert_branch_absent "$apply_missing_fork_dest" "sync/supersuit-*" "Local apply without dest does not create sync branch"
+    assert_path_absent "$apply_missing_fork_dest/plugins/supersuit/.codex-plugin/plugin.json" "Local apply without dest does not sync plugin files"
 
     echo ""
     echo "Source assertions..."
