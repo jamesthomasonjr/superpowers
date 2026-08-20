@@ -7,6 +7,7 @@ Config layers live under **`.supersuit/`** (canonical). Leftover `.superpowers/`
 **Design specs:**
 - [Configurable workflow graph](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
 - [Deterministic run/exec actions](superpowers/specs/2026-08-17-workflow-run-actions-design.md)
+- [Capability-aware overlays](superpowers/specs/2026-08-17-workflow-capability-overlays-design.md)
 
 ## Layer precedence
 
@@ -20,9 +21,9 @@ Configs merge in order (lowest → highest precedence):
 
 Later layers override earlier ones:
 
-- **`skills`:** replace-by-logical-id (whole entry). `skills.brainstorming: {}` clears a lower-layer alias or path back to identity.
+- **`skills`:** ungated entries replace-by-logical-id (whole entry). `skills.brainstorming: {}` clears a lower-layer alias or path back to identity. Gated entries (`when:` present) accumulate as candidates and do not replace the ungated entry.
 - **`entries`:** per-key replace.
-- **`transitions`:** replace-by-`from` — overlay transitions for a `from` id replace all bundled/user edges with that same `from`.
+- **`transitions`:** ungated overlay transitions still replace-by-`from`. Gated overlay transitions (`when:` present) are **appended** so a host-specific enhancement does not drop the baseline edges for that `from`.
 
 Missing overlay files are fine. Run the resolver to inspect the merged result:
 
@@ -98,6 +99,86 @@ Notes:
 
 The command prints JSON including `outcome` and `exit_code` on **stdout**. Child script stdout/stderr are forwarded to the CLI's stderr so the JSON stays parseable. Use `outcome` as the map's `on` for the next handoff.
 
+## Capability-aware overlays
+
+Hosts differ (SessionStart injection, native worktrees, subagents, exec hooks, Canvas). One static graph either underserves capable hosts or assumes tools that are missing. Overlays may gate transitions and skill registry entries with `when.capabilities` so enhanced edges apply only when the host advertises those tokens.
+
+```yaml
+version: 1
+
+skills:
+  ensure-worktree:
+    run:
+      argv:
+        - scripts/ensure-worktree.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - exec-hook
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-worktree
+    when:
+      capabilities:
+        - exec-hook
+```
+
+Write this as `.supersuit/workflow.yaml` (or leftover `.superpowers/workflow.yaml`). Without `exec-hook`, resolve keeps the bundled `approved-architectural → writing-plans` edge and omits the gated registry entry. With `exec-hook`, the gated edge and run entry win.
+
+Notes:
+
+- A `when.capabilities` list is **AND**: every listed token must be active. Express OR as two transitions.
+- **Gated** overlay transitions (`when:` present) are **appended** and do not replace baseline edges for that `from`.
+- **Ungated** overlay transitions still use replace-by-`from`.
+- **Gated** overlay skill entries accumulate as candidates. They do not replace a lower-layer remap. If the gate misses, the ungated entry (user remap or bundled identity) remains.
+- **Ungated** overlay skill entries still replace-by-logical-id.
+- At resolve time, among matching `(from, on)` or skill-id candidates, the most specific satisfied `when` (largest capability set) wins. Equal-size ties are a validation/resolve error.
+- Resolved JSON includes a `capabilities` list and has `when` stripped — agents follow the filtered map as-is. Do not re-read overlay `when:` clauses.
+- Unknown capability tokens are allowed (forward-compatible) but do not match until advertised.
+- `when` accepts only `capabilities`. Other keys (for example a product-name `harness:` switch) are rejected.
+
+### How to declare `when`
+
+```yaml
+when:
+  capabilities:
+    - exec-hook
+    - native-worktree
+```
+
+Place `when` on a transition and/or on a `skills.<id>` entry. The bundled `workflows/default.yaml` stays ungated.
+
+### How capabilities are detected
+
+Active capabilities are the union of, in order (first-seen wins for display order):
+
+1. **`--detect-capabilities`** — conservative process probes (see below)
+2. **`SUPERPOWERS_CAPABILITIES`** — comma-separated tokens from the environment
+3. **`--capabilities`** — comma-separated CLI tokens
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" --user-home "$HOME" \
+  --capabilities session-inject,exec-hook --pretty
+
+SUPERPOWERS_CAPABILITIES=exec-hook ./scripts/resolve-workflow --plugin-root "$PWD" \
+  --project-root "$PWD" --user-home "$HOME"
+```
+
+SessionStart passes `--detect-capabilities` and honors `SUPERPOWERS_CAPABILITIES`.
+
+| Token | Meaning | Auto-detected? |
+|-------|---------|----------------|
+| `session-inject` | Host injects bootstrap / workflow map at session start. | Yes, when `CURSOR_PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, or `COPILOT_CLI` is set (SessionStart-like env). |
+| `native-worktree` | Host owns worktree / workspace creation. | No. Advertise explicitly. Product name is not evidence. |
+| `subagents` | Host supports subagent dispatch. | No. Advertise explicitly. |
+| `exec-hook` | Host can run deterministic workflow actions without the chat model mediating. | No. SessionStart running is not the same as an exec hook. |
+| `native-canvas` | Host provides a native visual surface (e.g. Cursor Canvas). | No. Do not infer from `CURSOR_PLUGIN_ROOT`. |
+
+A missing capability probe (no hook env, no env override, no `--capabilities`) yields an empty set. Gated overlays do not apply. That is intentional: fail toward the Superpowers baseline rather than claiming Canvas, worktrees, subagents, or exec hooks from a product name.
+
 ## Example: replace brainstorming with a custom skill path
 
 Project file `.supersuit/workflow.yaml`:
@@ -156,5 +237,7 @@ The resolver validates merged config before emitting JSON. Common failures:
 - `path` must point at a directory containing `SKILL.md`
 - a skill entry cannot combine `skill`, `path`, and `run`/`exec`
 - `run.argv[0]` must exist under the entry's `allow` roots
+- `when` must be a mapping whose only key is `capabilities` (non-empty string list)
+- equally-specific matching `(from, on)` gates for the active capability set are ambiguous
 
 On SessionStart overlay failure, the hook warns and injects the bundled map. If even bundled resolve fails, it warns that no `WORKFLOW_MAP` is available (and does not claim defaults are in effect). Fix the YAML and start a new session, or run `resolve-workflow` manually to see errors on stderr.
