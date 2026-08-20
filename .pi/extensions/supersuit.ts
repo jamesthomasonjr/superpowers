@@ -13,7 +13,7 @@ const bootstrapSkillPath = resolve(skillsDir, "using-superpowers", "SKILL.md");
 
 let cachedBootstrap: string | null | undefined;
 
-export default function superpowersPiExtension(pi: ExtensionAPI) {
+export default function supersuitPiExtension(pi: ExtensionAPI) {
 	let injectBootstrap = true;
 
 	pi.on("resources_discover", async () => ({

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Package the Superpowers Codex plugin as a rootless archive for portal upload.
+# Package the Supersuit Codex plugin as a rootless archive for portal upload.
 #
 # The Codex portal artifact differs from the old openai/plugins sync flow:
 # it is a standalone archive, but it still needs the OpenAI-owned
@@ -26,14 +26,16 @@ Usage:
 
 Options:
   --output PATH            Write archive to PATH.
-                           Default: ../_tmp/sup-codex-packaging/superpowers-VERSION.zip
+                           Default: ../_tmp/sup-codex-packaging/supersuit-VERSION.zip
   --format FORMAT          Archive format: zip or tar.gz. Default: zip.
                            If --output ends in .zip, .tar.gz, or .tgz, that
                            extension is used when --format is omitted.
   --metadata-source PATH   Prior official package directory, .zip, or .tar.gz used to
                            seed skills/*/agents/openai.yaml.
-                           Default: ../_tmp/sup-codex-packaging/superpowers,
-                           falling back to superpowers.zip, then superpowers.tar.gz
+                           Default: ../_tmp/sup-codex-packaging/supersuit,
+                           falling back to supersuit.zip / supersuit.tar.gz,
+                           then a prior official Superpowers package used only
+                           to seed openai.yaml metadata.
   --ref REF                Git ref to package. Default: HEAD.
   --allow-dirty            Permit a dirty working tree. The archive still uses --ref.
   --keep-stage             Print and keep the temporary staging directory.
@@ -154,7 +156,13 @@ if [[ "$ALLOW_DIRTY" -ne 1 ]]; then
 fi
 
 if [[ -z "$METADATA_SOURCE" ]]; then
-  if [[ -d "$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers" ]]; then
+  if [[ -d "$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit" ]]; then
+    METADATA_SOURCE="$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit"
+  elif [[ -f "$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit.zip" ]]; then
+    METADATA_SOURCE="$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit.zip"
+  elif [[ -f "$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit.tar.gz" ]]; then
+    METADATA_SOURCE="$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit.tar.gz"
+  elif [[ -d "$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers" ]]; then
     METADATA_SOURCE="$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers"
   elif [[ -f "$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers.zip" ]]; then
     METADATA_SOURCE="$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers.zip"
@@ -165,7 +173,7 @@ if [[ -z "$METADATA_SOURCE" ]]; then
   fi
 fi
 
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/superpowers-codex-package.XXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/supersuit-codex-package.XXXXXX")"
 STAGE="$WORK_DIR/payload"
 METADATA_WORK="$WORK_DIR/metadata"
 ARCHIVE_LIST="$WORK_DIR/archive-list"
@@ -247,10 +255,10 @@ VERSION="$(jq -r '.version // empty' "$STAGE/.codex-plugin/plugin.json")"
 if [[ -z "$OUTPUT" ]]; then
   case "$FORMAT" in
     zip)
-      OUTPUT="$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers-$VERSION.zip"
+      OUTPUT="$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit-$VERSION.zip"
       ;;
     tar.gz)
-      OUTPUT="$REPO_ROOT/../_tmp/sup-codex-packaging/superpowers-$VERSION.tar.gz"
+      OUTPUT="$REPO_ROOT/../_tmp/sup-codex-packaging/supersuit-$VERSION.tar.gz"
       ;;
   esac
 fi

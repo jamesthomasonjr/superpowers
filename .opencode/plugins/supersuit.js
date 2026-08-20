@@ -1,7 +1,7 @@
 /**
- * Superpowers plugin for OpenCode.ai
+ * Supersuit plugin for OpenCode.ai
  *
- * Injects superpowers bootstrap context via message transform.
+ * Injects using-superpowers bootstrap context via message transform.
  * Auto-registers skills directory via config hook (no symlinks needed).
  */
 
@@ -52,7 +52,7 @@ const normalizePath = (p, homeDir) => {
 // every agent step.  See #1202 for the full analysis.
 let _bootstrapCache = undefined; // undefined = not yet loaded, null = file missing
 
-export const SuperpowersPlugin = async ({ client, directory }) => {
+export const SupersuitPlugin = async ({ client, directory }) => {
   const homeDir = os.homedir();
   const superpowersSkillsDir = path.resolve(__dirname, '../../skills');
   const envConfigDir = normalizePath(process.env.OPENCODE_CONFIG_DIR, homeDir);

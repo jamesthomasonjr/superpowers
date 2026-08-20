@@ -3,7 +3,7 @@
   "version": "6.3.0",
   "description": "Supersuit \u2014 a framework for building your own Superpowers-based workflow and skill toolchain (methodology by Jesse Vincent / obra / Prime Radiant). Not a Superpowers replacement; defaults match until you customize.",
   "type": "module",
-  "main": ".opencode/plugins/superpowers.js",
+  "main": ".opencode/plugins/supersuit.js",
   "keywords": [
     "pi-package",
     "skills",
@@ -14,7 +14,7 @@
   ],
   "pi": {
     "extensions": [
-      "./.pi/extensions/superpowers.ts"
+      "./.pi/extensions/supersuit.ts"
     ],
     "skills": [
       "./skills"

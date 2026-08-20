@@ -1,4 +1,18 @@
-# Superpowers Release Notes
+# Supersuit Release Notes
+
+This repository is **Supersuit** (`jeighty/supersuit`), a framework fork of Superpowers. Notes from **v6.3.0 and earlier** are inherited Superpowers history. They describe upstream Superpowers, not this product’s install identity.
+
+Install this fork from [jeighty/supersuit](https://github.com/jeighty/supersuit) (plugin id `supersuit`). Marketplace listings and commands named `superpowers` still resolve to [obra/superpowers](https://github.com/obra/superpowers).
+
+## Unreleased (this fork)
+
+- Distinct plugin / package id `supersuit`, skill namespace `supersuit:<skill>`, repo `jeighty/supersuit`.
+- Configurable workflow graph: bundled defaults match Superpowers until you add overlays.
+- Visual-companion telemetry tags `?v=` with `+supersuit` so Prime Radiant can tell fork traffic from upstream.
+
+# Superpowers history (inherited)
+
+The sections below are the Superpowers changelog inherited with the fork. Install commands such as `devin plugins install obra/superpowers` or `/plugin install superpowers@superpowers-marketplace` install **upstream Superpowers**, not this product.
 
 ## v6.3.0 (2026-08-12)
 

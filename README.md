@@ -105,15 +105,16 @@ Official marketplaces often still ship **upstream** Superpowers. To get **this**
 
 ### Claude Code
 
-Install from this repository (not the official marketplace plugin, which is upstream Superpowers):
+Register this repository as a marketplace, then install the plugin (not the official Superpowers listing):
 
 ```bash
-# From a local clone, or register this fork as a marketplace / plugin source
-# per your Claude Code plugin workflow, pointing at:
-#   https://github.com/jeighty/supersuit
+/plugin marketplace add https://github.com/jeighty/supersuit
+/plugin install supersuit@supersuit-dev
 ```
 
-If you only need stock Superpowers without workflow overlays, you can still use the [official Claude plugin marketplace](https://claude.com/plugins/superpowers) or `obra/superpowers-marketplace`.
+The marketplace id in `.claude-plugin/marketplace.json` is `supersuit-dev`; the plugin id is `supersuit`.
+
+If you only need stock Superpowers without workflow overlays, use the [official Claude plugin marketplace](https://claude.com/plugins/superpowers) or `obra/superpowers-marketplace`.
 
 ### Antigravity
 
@@ -149,7 +150,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Update to the latest version with:
 
   ```bash
-  devin plugins update superpowers
+  devin plugins update supersuit
   ```
 
 ### Factory Droid
@@ -163,7 +164,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Install the plugin:
 
   ```bash
-  droid plugin install supersuit@supersuit
+  droid plugin install supersuit@supersuit-dev
   ```
 
 ### Gemini CLI
@@ -177,7 +178,7 @@ Install from this repository (for example via a git-based or local plugin instal
 - Update later:
 
   ```bash
-  gemini extensions update superpowers
+  gemini extensions update supersuit
   ```
 
 ### GitHub Copilot CLI

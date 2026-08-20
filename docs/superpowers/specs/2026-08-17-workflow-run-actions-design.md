@@ -1,7 +1,7 @@
 # Workflow Deterministic Run/Exec Actions — Design Spec
 
 **Status:** Design + implementation for this fork (issue #5).
-**Product:** Supersuit (`jamesthomasonjr/superpowers`).
+**Product:** Supersuit (`jeighty/supersuit`).
 **Depends on:** Configurable workflow graph (merged via #4).
 **Pairs with:** Capability-aware overlays (#6); enables non-agent workspace
 management (#7).

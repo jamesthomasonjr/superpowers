@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Questions & Help
+  - name: Upstream Superpowers community
     url: https://discord.gg/35wsABTejz
-    about: For usage questions, troubleshooting help, and general discussion, please visit our Discord instead of opening an issue.
+    about: Superpowers (obra/superpowers) community Discord — not this fork’s support channel. For Supersuit, please open an issue here.
