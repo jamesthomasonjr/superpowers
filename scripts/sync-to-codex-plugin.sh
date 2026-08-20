@@ -15,16 +15,22 @@
 # identical diffs, so two back-to-back runs can verify the tool itself.
 #
 # Usage:
-#   ./scripts/sync-to-codex-plugin.sh                              # full run
-#   ./scripts/sync-to-codex-plugin.sh -n                           # dry run
-#   ./scripts/sync-to-codex-plugin.sh -y                           # skip confirm
+#   CODEX_PLUGINS_FORK=OWNER/REPO ./scripts/sync-to-codex-plugin.sh
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO            # full run
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO -n         # dry run
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO -y         # skip confirm
 #   ./scripts/sync-to-codex-plugin.sh --local PATH                 # existing checkout
-#   ./scripts/sync-to-codex-plugin.sh --base BRANCH                # default: main
-#   ./scripts/sync-to-codex-plugin.sh --bootstrap                  # create plugin dir if missing
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO --base BRANCH
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO --bootstrap
+#
+# Destination: a remote run requires CODEX_PLUGINS_FORK or --fork OWNER/REPO.
+# There is no default dest repo. The dest must already exist; --bootstrap only
+# creates plugins/supersuit/ inside that dest, it does not create the dest repo.
 #
 # Bootstrap mode: skips the "plugin must exist on base" requirement and creates
 # plugins/supersuit/ when absent, then copies the tracked plugin files from
-# this checkout just like a normal sync.
+# this checkout just like a normal sync. Use --bootstrap only after that dest
+# exists.
 #
 # Requires: bash, rsync, git, gh (authenticated), python3.
 
@@ -34,7 +40,7 @@ set -euo pipefail
 # Config — edit as upstream or canonical plugin shape evolves
 # =============================================================================
 
-FORK="${CODEX_PLUGINS_FORK:-jeighty/openai-codex-plugins}"
+FORK="${CODEX_PLUGINS_FORK:-}"
 DEFAULT_BASE="main"
 DEST_REL="plugins/supersuit"
 
@@ -156,6 +162,14 @@ while [[ $# -gt 0 ]]; do
     -n|--dry-run)  DRY_RUN=1; shift ;;
     -y|--yes)      YES=1; shift ;;
     --local)       LOCAL_CHECKOUT="$2"; shift 2 ;;
+    --fork)
+      if [[ $# -lt 2 || -z "${2:-}" || "$2" == -* ]]; then
+        echo "ERROR: --fork requires OWNER/REPO" >&2
+        usage 2
+      fi
+      FORK="$2"
+      shift 2
+      ;;
     --base)        BASE="$2"; shift 2 ;;
     --bootstrap)   BOOTSTRAP=1; shift ;;
     -h|--help)     usage 0 ;;
@@ -168,6 +182,10 @@ done
 # =============================================================================
 
 die() { echo "ERROR: $*" >&2; exit 1; }
+
+if [[ -z "$LOCAL_CHECKOUT" && -z "$FORK" ]]; then
+  die "destination repo required: set CODEX_PLUGINS_FORK or pass --fork OWNER/REPO. The dest repo must already exist (use --bootstrap only after that dest exists)."
+fi
 
 command -v rsync >/dev/null   || die "rsync not found in PATH"
 command -v git >/dev/null     || die "git not found in PATH"
@@ -222,6 +240,9 @@ if [[ -n "$LOCAL_CHECKOUT" ]]; then
   DEST_REPO="$(cd "$LOCAL_CHECKOUT" && pwd)"
   [[ -d "$DEST_REPO/.git" ]] || die "--local path '$DEST_REPO' is not a git checkout"
 else
+  if ! gh repo view "$FORK" >/dev/null 2>&1; then
+    die "destination repo '$FORK' is not cloneable (not found or not accessible). The dest repo must already exist (use --bootstrap only after that dest exists)."
+  fi
   echo "Cloning $FORK..."
   CLEANUP_DIR="$(mktemp -d)"
   DEST_REPO="$CLEANUP_DIR/openai-codex-plugins"

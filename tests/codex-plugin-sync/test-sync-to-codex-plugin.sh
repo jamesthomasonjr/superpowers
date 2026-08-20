@@ -524,6 +524,50 @@ run_help() {
     PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" "$upstream/scripts/sync-to-codex-plugin.sh" --help 2>&1
 }
 
+write_logging_fake_gh() {
+    local bin_dir="$1"
+    local log="$2"
+
+    mkdir -p "$bin_dir"
+
+    cat > "$bin_dir/gh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' "\$*" >> "$log"
+
+if [[ "\${1:-}" == "auth" && "\${2:-}" == "status" ]]; then
+    exit 0
+fi
+
+if [[ "\${1:-}" == "repo" && "\${2:-}" == "view" ]]; then
+    exit 1
+fi
+
+exit 1
+EOF
+
+    chmod +x "$bin_dir/gh"
+}
+
+run_non_local_preview() {
+    local upstream="$1"
+    local fake_bin="$2"
+    shift 2
+
+    env -u CODEX_PLUGINS_FORK PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -n "$@" 2>&1
+}
+
+run_non_local_preview_with_fork_env() {
+    local upstream="$1"
+    local fake_bin="$2"
+    local fork="$3"
+
+    env CODEX_PLUGINS_FORK="$fork" PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -n 2>&1
+}
+
 write_bootstrap_destination_fixture() {
     local repo="$1"
 
@@ -567,6 +611,15 @@ main() {
     local script_source
     local dirty_skill_path
     local noop_openai_metadata_path
+    local dest_fake_bin
+    local dest_gh_log
+    local missing_fork_status
+    local missing_fork_output
+    local missing_fork_log
+    local uncloneable_status
+    local uncloneable_output
+    local uncloneable_log
+    local uncloneable_fork
 
     echo "=== Test: sync-to-codex-plugin dry-run regression ==="
 
@@ -635,6 +688,18 @@ main() {
     dirty_apply_status=$?
     noop_apply_output="$(run_apply "$upstream" "$noop_apply_dest" "$fake_bin")"
     noop_apply_status=$?
+    dest_fake_bin="$TEST_ROOT/dest-bin"
+    dest_gh_log="$TEST_ROOT/dest-gh.log"
+    uncloneable_fork="missing-org/does-not-exist-codex-plugins"
+    : > "$dest_gh_log"
+    write_logging_fake_gh "$dest_fake_bin" "$dest_gh_log"
+    missing_fork_output="$(run_non_local_preview "$upstream" "$dest_fake_bin")"
+    missing_fork_status=$?
+    missing_fork_log="$(cat "$dest_gh_log")"
+    : > "$dest_gh_log"
+    uncloneable_output="$(run_non_local_preview_with_fork_env "$upstream" "$dest_fake_bin" "$uncloneable_fork")"
+    uncloneable_status=$?
+    uncloneable_log="$(cat "$dest_gh_log")"
     missing_manifest_output="$(run_preview_without_manifest "$upstream" "$dest" "$fake_bin")"
     missing_manifest_status=$?
     set -e
@@ -718,12 +783,33 @@ Locally modified fixture content." "Dirty local apply preserves tracked working-
     echo ""
     echo "Help assertions..."
     assert_not_contains "$help_output" "--assets-src" "Help omits --assets-src"
+    assert_contains "$help_output" "--fork" "Help documents --fork dest"
+    assert_contains "$help_output" "CODEX_PLUGINS_FORK" "Help documents CODEX_PLUGINS_FORK dest"
+    assert_contains "$help_output" "must already exist" "Help says dest repo must already exist"
+    assert_not_contains "$help_output" "jeighty/openai-codex-plugins" "Help does not imply a default jeighty Codex plugins repo"
+
+    echo ""
+    echo "Destination dest-required assertions..."
+    assert_equals "$missing_fork_status" "1" "Non-local run without dest exits with failure"
+    assert_contains "$missing_fork_output" "CODEX_PLUGINS_FORK" "Missing dest names CODEX_PLUGINS_FORK"
+    assert_contains "$missing_fork_output" "--fork" "Missing dest names --fork"
+    assert_contains "$missing_fork_output" "must already exist" "Missing dest says dest repo must already exist"
+    assert_not_contains "$missing_fork_output" "Cloning " "Missing dest fails before clone"
+    assert_not_contains "$missing_fork_log" "repo clone" "Missing dest does not invoke gh repo clone"
+    assert_equals "$uncloneable_status" "1" "Non-local run with uncloneable dest exits with failure"
+    assert_contains "$uncloneable_output" "$uncloneable_fork" "Uncloneable dest names the dest repo"
+    assert_contains "$uncloneable_output" "must already exist" "Uncloneable dest says dest repo must already exist"
+    assert_not_contains "$uncloneable_output" "Cloning " "Uncloneable dest fails before clone"
+    assert_not_contains "$uncloneable_log" "repo clone" "Uncloneable dest does not invoke gh repo clone"
 
     echo ""
     echo "Source assertions..."
     assert_not_contains "$script_source" "regenerated inline" "Source drops regenerated inline phrasing"
     assert_not_contains "$script_source" "Brand Assets directory" "Source drops Brand Assets directory phrasing"
     assert_not_contains "$script_source" "--assets-src" "Source drops --assets-src"
+    assert_not_contains "$script_source" "jeighty/openai-codex-plugins" "Source has no baked-in jeighty Codex plugins dest"
+    assert_not_contains "$script_source" "prime-radiant-inc/openai-codex-plugins" "Source has no baked-in Prime Radiant Codex plugins dest"
+    assert_not_matches "$script_source" 'CODEX_PLUGINS_FORK:-[^}"[:space:]]' "Source has no non-empty CODEX_PLUGINS_FORK default"
 
     if [[ $FAILURES -ne 0 ]]; then
         echo ""
