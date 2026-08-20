@@ -22,8 +22,9 @@ clone_skills() {
 }
 
 if [[ -d "${SKILLS_SRC}/.git" ]]; then
+  # Shallow single-branch clones may lack origin/<ref> after a later fetch.
   git -C "${SKILLS_SRC}" fetch --depth 1 origin "${SKILLS_REF}"
-  git -C "${SKILLS_SRC}" reset --hard "origin/${SKILLS_REF}"
+  git -C "${SKILLS_SRC}" reset --hard FETCH_HEAD
 else
   rm -rf "${SKILLS_SRC}"
   clone_skills
