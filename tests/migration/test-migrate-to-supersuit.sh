@@ -270,6 +270,95 @@ else
   sed 's/^/    /' "$TEST_ROOT/distinct.out"
 fi
 
+# --- file symlink to an outside target is not rewritten ---
+outside_target="$TEST_ROOT/outside-shared.md"
+printf 'superpowers:brainstorming\n' >"$outside_target"
+symlink_proj="$TEST_ROOT/symlink-proj"
+mkdir -p "$symlink_proj"
+ln -s "$outside_target" "$symlink_proj/AGENTS.md"
+printf 'regular superpowers:writing-plans\n' >"$symlink_proj/NOTES.md"
+if ! "$SCRIPT_UNDER_TEST" --write "$symlink_proj" \
+  >"$TEST_ROOT/symlink.out" 2>"$TEST_ROOT/symlink.err"; then
+  fail "symlink tree --write exits 0"
+  sed 's/^/    /' "$TEST_ROOT/symlink.err"
+else
+  pass "symlink tree --write exits 0"
+fi
+if [[ -L "$symlink_proj/AGENTS.md" ]]; then
+  pass "leaves AGENTS.md as a symlink"
+else
+  fail "leaves AGENTS.md as a symlink"
+fi
+assert_file_contains "$outside_target" "superpowers:brainstorming" \
+  "does not rewrite a symlink target outside the tree"
+assert_file_not_contains "$outside_target" "supersuit:brainstorming" \
+  "outside symlink target keeps the old prefix"
+assert_file_contains "$symlink_proj/NOTES.md" "supersuit:writing-plans" \
+  "still rewrites regular files in the same tree"
+
+# --- non-regular file (FIFO) is not opened / does not hang ---
+fifo_proj="$TEST_ROOT/fifo-proj"
+mkdir -p "$fifo_proj"
+mkfifo "$fifo_proj/pipe"
+printf 'superpowers:brainstorming\n' >"$fifo_proj/README.md"
+if command -v timeout >/dev/null 2>&1; then
+  set +e
+  timeout 5 "$SCRIPT_UNDER_TEST" --write "$fifo_proj" \
+    >"$TEST_ROOT/fifo.out" 2>"$TEST_ROOT/fifo.err"
+  fifo_status=$?
+  set -e
+else
+  set +e
+  "$SCRIPT_UNDER_TEST" --write "$fifo_proj" \
+    >"$TEST_ROOT/fifo.out" 2>"$TEST_ROOT/fifo.err"
+  fifo_status=$?
+  set -e
+fi
+if [[ "$fifo_status" -eq 0 ]]; then
+  pass "FIFO in tree does not hang and exits 0"
+else
+  fail "FIFO in tree does not hang and exits 0"
+  echo "    exit: $fifo_status"
+  sed 's/^/    /' "$TEST_ROOT/fifo.err"
+fi
+assert_file_contains "$fifo_proj/README.md" "supersuit:brainstorming" \
+  "rewrites regular files next to a FIFO"
+if [[ -p "$fifo_proj/pipe" ]]; then
+  pass "leaves the FIFO in place"
+else
+  fail "leaves the FIFO in place"
+fi
+
+# --- binaries-only tree is a no-op dry-run ---
+bin_only="$TEST_ROOT/bin-only"
+mkdir -p "$bin_only"
+printf 'superpowers:\x00png' >"$bin_only/icon.bin"
+if ! "$SCRIPT_UNDER_TEST" -n "$bin_only" \
+  >"$TEST_ROOT/bin-only.out" 2>"$TEST_ROOT/bin-only.err"; then
+  fail "binaries-only dry-run exits 0"
+  sed 's/^/    /' "$TEST_ROOT/bin-only.err"
+else
+  pass "binaries-only dry-run exits 0"
+fi
+if grep -Fq 'no changes needed' "$TEST_ROOT/bin-only.out"; then
+  pass "binaries-only dry-run prints no changes needed"
+else
+  fail "binaries-only dry-run prints no changes needed"
+  sed 's/^/    /' "$TEST_ROOT/bin-only.out"
+fi
+if grep -Fq 'skip-binary' "$TEST_ROOT/bin-only.out"; then
+  fail "binaries-only dry-run does not list skip-binary"
+  sed 's/^/    /' "$TEST_ROOT/bin-only.out"
+else
+  pass "binaries-only dry-run does not list skip-binary"
+fi
+if grep -Fq 'Re-run with --write' "$TEST_ROOT/bin-only.out"; then
+  fail "binaries-only dry-run does not tell the user to --write"
+  sed 's/^/    /' "$TEST_ROOT/bin-only.out"
+else
+  pass "binaries-only dry-run does not tell the user to --write"
+fi
+
 # --- dest exists: do not clobber ---
 both="$TEST_ROOT/both"
 mkdir -p "$both/.superpowers" "$both/.supersuit"

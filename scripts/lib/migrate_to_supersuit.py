@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import stat
 import sys
 from pathlib import Path
 
@@ -45,6 +46,14 @@ def rewrite_text(text: str) -> str:
     return text.replace(OLD_PREFIX, NEW_PREFIX)
 
 
+def is_regular_file(path: Path) -> bool:
+    """True for a non-symlink regular file. lstat so we never follow links."""
+    try:
+        return stat.S_ISREG(path.lstat().st_mode)
+    except OSError:
+        return False
+
+
 def is_binary(path: Path) -> bool:
     try:
         with path.open("rb") as handle:
@@ -55,7 +64,7 @@ def is_binary(path: Path) -> bool:
 
 
 def iter_files(root: Path) -> list[Path]:
-    if root.is_file():
+    if is_regular_file(root):
         return [root]
     if not root.is_dir():
         return []
@@ -65,7 +74,9 @@ def iter_files(root: Path) -> list[Path]:
             name for name in dirnames if name not in SKIP_DIR_NAMES
         )
         for name in sorted(filenames):
-            found.append(Path(dirpath) / name)
+            candidate = Path(dirpath) / name
+            if is_regular_file(candidate):
+                found.append(candidate)
     return found
 
 
@@ -120,8 +131,9 @@ def migrate_paths(
                 rewrite_targets.append(path)
 
     for path in rewrite_targets:
+        if not is_regular_file(path):
+            continue
         if is_binary(path):
-            actions.append(f"skip-binary {path}")
             continue
         try:
             original = path.read_text(encoding="utf-8")

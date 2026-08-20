@@ -29,11 +29,10 @@ After install, invoke the bootstrap as `supersuit:using-superpowers`.
 
 ## 3. Rewrite invocations and move leftover dirs
 
-From a checkout of this repository (or a copy of `scripts/migrate-to-supersuit`):
+Run the script from a checkout or plugin install of this repository. The bash wrapper `scripts/migrate-to-supersuit` execs `scripts/lib/migrate_to_supersuit.py`; if you copy the helper out, copy both files and keep that relative layout. Do not run it with no path from this checkout — that dry-runs a rewrite of this repo’s own docs and tests.
 
 ```bash
 # Dry-run (default): prints planned rewrites and moves, writes nothing
-./scripts/migrate-to-supersuit
 ./scripts/migrate-to-supersuit -n /path/to/your/project
 
 # Apply
