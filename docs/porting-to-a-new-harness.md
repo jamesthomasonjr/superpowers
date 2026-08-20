@@ -98,7 +98,7 @@ one non-negotiable capability. It can take any form:
   pointing at the extension's own `GEMINI.md`) — not a file you edit in the user's
   home.
 
-If the only way to get Superpowers in front of the model is for your human
+If the only way to get Supersuit in front of the model is for your human
 partner to opt in each session (paste a prompt, run a command, enable a mode),
 the harness
 **cannot** be properly supported. The acceptance test in Part 3 will fail, and
@@ -256,8 +256,8 @@ The harness loads a JS/TS module that exposes lifecycle callbacks. You register
 the skills directory through the harness's API and inject the bootstrap by
 mutating the message array in code.
 
-- Reference: `.opencode/plugins/superpowers.js` (JavaScript) and
-  `.pi/extensions/superpowers.ts` (TypeScript). pi is the closest reference for
+- Reference: `.opencode/plugins/supersuit.js` (JavaScript) and
+  `.pi/extensions/supersuit.ts` (TypeScript). pi is the closest reference for
   any harness that has **no native skill tool**.
 
 ### Shape C — Instructions-file
@@ -491,7 +491,7 @@ Where the mapping lives depends on shape:
   section links the per-harness references files. (Shape A harnesses have no
   instructions file; the mapping is *not* inlined into the hook output.)
 - **Shape B:** the mapping is typically inlined into the bootstrap string you
-  inject (see the `toolMapping` constant in `superpowers.js`). pi keeps it in
+  inject (see the `toolMapping` constant in `supersuit.js`). pi keeps it in
   *both* places — `piToolMapping()` inline **and** `references/pi-tools.md`. If
   you maintain it in two places, update both, or the port is half-done.
 - **Shape C:** put it in `references/<harness>-tools.md` and pull it into the
@@ -674,7 +674,7 @@ it. Distribution differs per harness ecosystem — find yours:
 
 | Channel | Example | What you do |
 |---|---|---|
-| Native plugin marketplace | Claude Code | Register in `.claude-plugin/marketplace.json`; users `/plugin install`. The external `superpowers-marketplace` repo is the source of truth users install from — see the release steps in `CLAUDE.md`. |
+| Native plugin marketplace | Claude Code | Register in `.claude-plugin/marketplace.json`; users `/plugin marketplace add https://github.com/jeighty/supersuit` then `/plugin install supersuit@supersuit-dev`. Official `obra/superpowers-marketplace` still ships upstream Superpowers. |
 | External marketplace fork, synced by script | Codex | `scripts/sync-to-codex-plugin.sh` rsyncs the tracked plugin files into a separate fork repo and opens a PR. Read its include/exclude list so you ship the right tree (it deliberately drops repo-internal dirs and other harnesses' dotdirs). |
 | Git-URL extension install | Gemini, Kimi Code, OpenCode | Users install from a git URL (`gemini extensions install …`; Kimi Code `/plugins install …`; an `opencode.json` `plugin` array entry). Document the exact command. |
 | Package-manifest fields | pi | Declared through fields in the repo-root `package.json`; users install via the harness's package command. |
@@ -790,13 +790,13 @@ Use this as the live index; when in doubt, read the files, not this table.
 | Copilot CLI | (shares Claude Code hook path; `COPILOT_CLI` env) | shell hook → `hooks/session-start` (`additionalContext`) | none needed (Claude Code–compatible tool surface) | `tests/hooks/` | — |
 | Gemini CLI | `gemini-extension.json` + `GEMINI.md` | instructions file `@`-includes bootstrap + mapping | `references/gemini-tools.md` | — | `gemini extensions install` |
 | Kimi Code | `.kimi-plugin/plugin.json` | manifest `sessionStart.skill` loads `using-superpowers` | inline `skillInstructions` in manifest | `tests/kimi/` | marketplace or `/plugins install` GitHub URL |
-| OpenCode | `.opencode/plugins/superpowers.js` (declared via root `package.json` `main`) | in-process: `config` hook registers skills dir; `experimental.chat.messages.transform` injects user message | inline in `superpowers.js` | `tests/opencode/` | `opencode.json` plugin git URL |
-| pi | `.pi/extensions/superpowers.ts` | in-process: `resources_discover` registers skills; `context` event injects user message; lifecycle-flag + compaction-aware | `piToolMapping()` inline **and** `references/pi-tools.md` | `tests/pi/` | repo-root `package.json` fields |
+| OpenCode | `.opencode/plugins/supersuit.js` (declared via root `package.json` `main`) | in-process: `config` hook registers skills dir; `experimental.chat.messages.transform` injects user message | inline in `supersuit.js` | `tests/opencode/` | `opencode.json` plugin git URL |
+| pi | `.pi/extensions/supersuit.ts` | in-process: `resources_discover` registers skills; `context` event injects user message; lifecycle-flag + compaction-aware | `piToolMapping()` inline **and** `references/pi-tools.md` | `tests/pi/` | repo-root `package.json` fields |
 
 ## Appendix B — Gotchas that have bitten porters
 
 - **Opt-in isn't a port.** If your human partner has to do anything per session
-  to get Superpowers, the acceptance test fails. Re-read Part 2.
+  to get Supersuit, the acceptance test fails. Re-read Part 2.
 - **Wrong JSON field → silent failure or double injection.** Shape A only.
   Confirm the exact field/nesting; Claude Code reads two fields without dedup.
 - **Hook-config schema varies per harness.** Shape A. Cursor's `hooks-cursor.json`

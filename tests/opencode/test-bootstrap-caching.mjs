@@ -29,7 +29,7 @@ fs.readFileSync = function (...args) {
 };
 
 const mod = await import(pathToFileURL(pluginPath).href);
-const plugin = await mod.SuperpowersPlugin({ client: {}, directory: '.' });
+const plugin = await mod.SupersuitPlugin({ client: {}, directory: '.' });
 const transform = plugin['experimental.chat.messages.transform'];
 
 const firstOutput = makeOutput(`${scenario} bootstrap first step`);

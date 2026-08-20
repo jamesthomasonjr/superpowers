@@ -4,9 +4,8 @@ sections blank, contain multiple unrelated changes, or show no evidence
 of human involvement will be closed without review.
 -->
 
-> **This PR MUST target the `dev` branch, not `main`.** `main` is the
-> released branch; active work lands on `dev` first. PRs opened against
-> `main` will be asked to retarget `dev` before review.
+> **This PR MUST target `main`.** `main` is this fork’s default and
+> released branch. Open feature-branch PRs against `main`.
 
 ## Who is submitting this PR? (required)
 <!-- Required. PRs that omit this will be closed. We assume an agent wrote
@@ -32,18 +31,14 @@ of human involvement will be closed without review.
 ## What does this PR change?
 <!-- 1-3 sentences. What, not why — the "why" belongs above. -->
 
-## Is this change appropriate for the core library?
-<!-- Superpowers core contains general-purpose skills and infrastructure
-     that benefit all users. Ask yourself:
+## Does this change belong in this fork?
+<!-- Supersuit is a framework fork of Superpowers. Fork-specific work
+     (workflow graph, overlays, install identity, this repo’s docs) belongs
+     here. Compatible improvements that Superpowers core would accept should
+     also be offered upstream to obra/superpowers.
 
-     - Would this be useful to someone working on a completely different
-       kind of project than yours?
-     - Is this project-specific, team-specific, or tool-specific?
-     - Does this integrate or promote a third-party service?
-
-     If your change is a new skill for a specific domain, workflow tool,
-     or third-party integration, it belongs in its own plugin — not here.
-     See the plugin development docs for how to publish it separately. -->
+     Domain-specific, team-specific, or third-party integration skills still
+     belong in their own plugin — not this core. -->
 
 ## What alternatives did you consider?
 <!-- What other approaches did you try or evaluate before landing on this
@@ -74,9 +69,9 @@ of human involvement will be closed without review.
      integration actually works.
 
      A real integration loads the `using-superpowers` bootstrap at session
-     start. The bootstrap is what causes skills to auto-trigger. Without
-     it, the skills are dead weight — present on disk but never invoked
-     at the right moments.
+     start (invoked as `supersuit:using-superpowers`). The bootstrap is
+     what causes skills to auto-trigger. Without it, the skills are dead
+     weight — present on disk but never invoked at the right moments.
 
      ACCEPTANCE TEST: Open a clean session in the new harness and send
      exactly this user message:
@@ -117,11 +112,11 @@ paste the complete transcript here
 
 ## Rigor
 
-- [ ] If this is a skills change: I used `superpowers:writing-skills` and
+- [ ] If this is a skills change: I used `supersuit:writing-skills` and
       completed adversarial pressure testing (paste results below)
 - [ ] This change was tested adversarially, not just on the happy path
 - [ ] I did not modify carefully-tuned content (Red Flags table,
-      rationalizations, "human partner" language) without extensive evals
+      rationalizations, "human partner" language) without evidence
       showing the change is an improvement
 
 <!-- If you changed wording in skills that shape agent behavior, show your
@@ -136,7 +131,7 @@ STOP. If the checkbox above is not checked, do not submit this PR.
 PRs will be closed without review if they:
 - Show no evidence of human involvement
 - Contain multiple unrelated changes
-- Promote or integrate third-party services or tools
+- Promote or integrate third-party services or tools as core
 - Submit project-specific or personal configuration as core changes
 - Leave required sections blank or use placeholder text
 - Modify behavior-shaping content without eval evidence

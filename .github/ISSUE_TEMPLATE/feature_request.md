@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Propose a change or addition to Superpowers
+about: Propose a change or addition to Supersuit
 labels: enhancement
 ---
 
@@ -25,10 +25,11 @@ progress, and some were intentionally declined.
 <!-- What other approaches could solve the same problem? Why is your
      proposal better? -->
 
-## Is this appropriate for core Superpowers?
-<!-- Would this benefit someone working on a completely different kind
-     of project? If this is specific to your domain, workflow, or a
-     third-party tool, it may belong as its own plugin instead. -->
+## Does this belong in this fork?
+<!-- Supersuit is a framework fork. Workflow-graph, overlay, and identity
+     work belong here. Generic Superpowers improvements should also be
+     offered upstream. Domain-specific or third-party tools belong in
+     their own plugin. -->
 
 ## Environment (required)
 <!-- Required. We assume an agent wrote this request — tell us which one and
@@ -37,7 +38,7 @@ progress, and some were intentionally declined.
 
 | Field | Value |
 |-------|-------|
-| Superpowers version | |
+| Supersuit version | |
 | Harness (Claude Code, Cursor, etc.) | |
 | Harness version | |
 | Your model + version | |

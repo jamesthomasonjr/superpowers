@@ -225,14 +225,14 @@ EOF
 
     cat > "$repo/.codex-plugin/plugin.json" <<EOF
 {
-  "name": "superpowers",
+  "name": "supersuit",
   "version": "$MANIFEST_VERSION"
 }
 EOF
 
     cat > "$repo/.kimi-plugin/plugin.json" <<EOF
 {
-  "name": "superpowers",
+  "name": "supersuit",
   "version": "$MANIFEST_VERSION"
 }
 EOF
@@ -314,15 +314,15 @@ EOF
 write_destination_fixture() {
     local repo="$1"
 
-    mkdir -p "$repo/plugins/superpowers/skills/example"
-    printf 'fixture keep\n' > "$repo/plugins/superpowers/.fixture-keep"
-    cat > "$repo/plugins/superpowers/skills/example/SKILL.md" <<'EOF'
+    mkdir -p "$repo/plugins/supersuit/skills/example"
+    printf 'fixture keep\n' > "$repo/plugins/supersuit/.fixture-keep"
+    cat > "$repo/plugins/supersuit/skills/example/SKILL.md" <<'EOF'
 # Example Skill
 
 Fixture content.
 EOF
-    git -C "$repo" add plugins/superpowers/.fixture-keep
-    git -C "$repo" add plugins/superpowers/skills/example/SKILL.md
+    git -C "$repo" add plugins/supersuit/.fixture-keep
+    git -C "$repo" add plugins/supersuit/skills/example/SKILL.md
 
     commit_fixture "$repo" "Initial destination fixture"
 }
@@ -330,15 +330,15 @@ EOF
 add_openai_agent_metadata_fixture() {
     local repo="$1"
 
-    mkdir -p "$repo/plugins/superpowers/skills/example/agents"
+    mkdir -p "$repo/plugins/supersuit/skills/example/agents"
 
-    cat > "$repo/plugins/superpowers/skills/example/agents/openai.yaml" <<'EOF'
+    cat > "$repo/plugins/supersuit/skills/example/agents/openai.yaml" <<'EOF'
 interface:
   display_name: "Example"
   short_description: "Destination-owned OpenAI metadata"
 EOF
 
-    git -C "$repo" add plugins/superpowers/skills/example/agents/openai.yaml
+    git -C "$repo" add plugins/supersuit/skills/example/agents/openai.yaml
 
     commit_fixture "$repo" "Add OpenAI agent metadata fixture"
 }
@@ -346,7 +346,7 @@ EOF
 dirty_tracked_destination_skill() {
     local repo="$1"
 
-    cat > "$repo/plugins/superpowers/skills/example/SKILL.md" <<'EOF'
+    cat > "$repo/plugins/supersuit/skills/example/SKILL.md" <<'EOF'
 # Example Skill
 
 Locally modified fixture content.
@@ -357,27 +357,27 @@ write_synced_destination_fixture() {
     local repo="$1"
 
     mkdir -p \
-        "$repo/plugins/superpowers/.codex-plugin" \
-        "$repo/plugins/superpowers/.private-journal" \
-        "$repo/plugins/superpowers/assets" \
-        "$repo/plugins/superpowers/hooks" \
-        "$repo/plugins/superpowers/skills/example/agents" \
-        "$repo/plugins/superpowers/skills/example"
+        "$repo/plugins/supersuit/.codex-plugin" \
+        "$repo/plugins/supersuit/.private-journal" \
+        "$repo/plugins/supersuit/assets" \
+        "$repo/plugins/supersuit/hooks" \
+        "$repo/plugins/supersuit/skills/example/agents" \
+        "$repo/plugins/supersuit/skills/example"
 
-    cat > "$repo/plugins/superpowers/.codex-plugin/plugin.json" <<EOF
+    cat > "$repo/plugins/supersuit/.codex-plugin/plugin.json" <<EOF
 {
-  "name": "superpowers",
+  "name": "supersuit",
   "version": "$MANIFEST_VERSION"
 }
 EOF
 
-    cat > "$repo/plugins/superpowers/assets/superpowers-small.svg" <<'EOF'
+    cat > "$repo/plugins/supersuit/assets/superpowers-small.svg" <<'EOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>
 EOF
 
-    printf 'png fixture\n' > "$repo/plugins/superpowers/assets/app-icon.png"
+    printf 'png fixture\n' > "$repo/plugins/supersuit/assets/app-icon.png"
 
-    cat > "$repo/plugins/superpowers/hooks/hooks-codex.json" <<'EOF'
+    cat > "$repo/plugins/supersuit/hooks/hooks-codex.json" <<'EOF'
 {
   "hooks": {
     "SessionStart": [
@@ -396,46 +396,46 @@ EOF
 }
 EOF
 
-    cat > "$repo/plugins/superpowers/hooks/session-start" <<'EOF'
+    cat > "$repo/plugins/supersuit/hooks/session-start" <<'EOF'
 #!/usr/bin/env sh
 echo "session-start fixture"
 EOF
-    cat > "$repo/plugins/superpowers/hooks/session-start-codex" <<'EOF'
+    cat > "$repo/plugins/supersuit/hooks/session-start-codex" <<'EOF'
 #!/usr/bin/env sh
 echo "session-start-codex fixture"
 EOF
 
-    cat > "$repo/plugins/superpowers/hooks/run-hook.cmd" <<'EOF'
+    cat > "$repo/plugins/supersuit/hooks/run-hook.cmd" <<'EOF'
 @echo off
 echo run-hook fixture
 EOF
-    chmod +x "$repo/plugins/superpowers/hooks/session-start" "$repo/plugins/superpowers/hooks/session-start-codex" "$repo/plugins/superpowers/hooks/run-hook.cmd"
+    chmod +x "$repo/plugins/supersuit/hooks/session-start" "$repo/plugins/supersuit/hooks/session-start-codex" "$repo/plugins/supersuit/hooks/run-hook.cmd"
 
-    cat > "$repo/plugins/superpowers/skills/example/SKILL.md" <<'EOF'
+    cat > "$repo/plugins/supersuit/skills/example/SKILL.md" <<'EOF'
 # Example Skill
 
 Fixture content.
 EOF
 
-    cat > "$repo/plugins/superpowers/skills/example/agents/openai.yaml" <<'EOF'
+    cat > "$repo/plugins/supersuit/skills/example/agents/openai.yaml" <<'EOF'
 interface:
   display_name: "Example"
   short_description: "Destination-owned OpenAI metadata"
 EOF
 
-    printf 'tracked keep\n' > "$repo/plugins/superpowers/.private-journal/keep.txt"
+    printf 'tracked keep\n' > "$repo/plugins/supersuit/.private-journal/keep.txt"
 
     git -C "$repo" add \
-        plugins/superpowers/.codex-plugin/plugin.json \
-        plugins/superpowers/assets/app-icon.png \
-        plugins/superpowers/assets/superpowers-small.svg \
-        plugins/superpowers/hooks/hooks-codex.json \
-        plugins/superpowers/hooks/run-hook.cmd \
-        plugins/superpowers/hooks/session-start \
-        plugins/superpowers/hooks/session-start-codex \
-        plugins/superpowers/skills/example/agents/openai.yaml \
-        plugins/superpowers/skills/example/SKILL.md \
-        plugins/superpowers/.private-journal/keep.txt
+        plugins/supersuit/.codex-plugin/plugin.json \
+        plugins/supersuit/assets/app-icon.png \
+        plugins/supersuit/assets/superpowers-small.svg \
+        plugins/supersuit/hooks/hooks-codex.json \
+        plugins/supersuit/hooks/run-hook.cmd \
+        plugins/supersuit/hooks/session-start \
+        plugins/supersuit/hooks/session-start-codex \
+        plugins/supersuit/skills/example/agents/openai.yaml \
+        plugins/supersuit/skills/example/SKILL.md \
+        plugins/supersuit/.private-journal/keep.txt
 
     commit_fixture "$repo" "Initial synced destination fixture"
 }
@@ -444,14 +444,14 @@ write_stale_ignored_destination_fixture() {
     local repo="$1"
 
     mkdir -p \
-        "$repo/plugins/superpowers/.kimi-plugin" \
-        "$repo/plugins/superpowers/.private-journal"
-    printf 'fixture keep\n' > "$repo/plugins/superpowers/.fixture-keep"
-    printf '{"name":"stale-kimi"}\n' > "$repo/plugins/superpowers/.kimi-plugin/plugin.json"
-    printf 'stale ignored leak\n' > "$repo/plugins/superpowers/.private-journal/leak.txt"
+        "$repo/plugins/supersuit/.kimi-plugin" \
+        "$repo/plugins/supersuit/.private-journal"
+    printf 'fixture keep\n' > "$repo/plugins/supersuit/.fixture-keep"
+    printf '{"name":"stale-kimi"}\n' > "$repo/plugins/supersuit/.kimi-plugin/plugin.json"
+    printf 'stale ignored leak\n' > "$repo/plugins/supersuit/.private-journal/leak.txt"
     git -C "$repo" add \
-        plugins/superpowers/.fixture-keep \
-        plugins/superpowers/.kimi-plugin/plugin.json
+        plugins/supersuit/.fixture-keep \
+        plugins/supersuit/.kimi-plugin/plugin.json
 
     commit_fixture "$repo" "Initial stale ignored destination fixture"
 }
@@ -517,11 +517,64 @@ run_apply() {
     PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" "$upstream/scripts/sync-to-codex-plugin.sh" -y --local "$dest" 2>&1
 }
 
+run_local_apply_without_fork() {
+    local upstream="$1"
+    local dest="$2"
+    local fake_bin="$3"
+
+    env -u CODEX_PLUGINS_FORK PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -y --local "$dest" 2>&1
+}
+
 run_help() {
     local upstream="$1"
     local fake_bin="$2"
 
     PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" "$upstream/scripts/sync-to-codex-plugin.sh" --help 2>&1
+}
+
+write_logging_fake_gh() {
+    local bin_dir="$1"
+    local log="$2"
+
+    mkdir -p "$bin_dir"
+
+    cat > "$bin_dir/gh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' "\$*" >> "$log"
+
+if [[ "\${1:-}" == "auth" && "\${2:-}" == "status" ]]; then
+    exit 0
+fi
+
+if [[ "\${1:-}" == "repo" && "\${2:-}" == "view" ]]; then
+    exit 1
+fi
+
+exit 1
+EOF
+
+    chmod +x "$bin_dir/gh"
+}
+
+run_non_local_preview() {
+    local upstream="$1"
+    local fake_bin="$2"
+    shift 2
+
+    env -u CODEX_PLUGINS_FORK PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -n "$@" 2>&1
+}
+
+run_non_local_preview_with_fork_env() {
+    local upstream="$1"
+    local fake_bin="$2"
+    local fork="$3"
+
+    env CODEX_PLUGINS_FORK="$fork" PATH="$fake_bin:$PATH" "$BASH_UNDER_TEST" \
+        "$upstream/scripts/sync-to-codex-plugin.sh" -n 2>&1
 }
 
 write_bootstrap_destination_fixture() {
@@ -567,6 +620,21 @@ main() {
     local script_source
     local dirty_skill_path
     local noop_openai_metadata_path
+    local dest_fake_bin
+    local dest_gh_log
+    local missing_fork_status
+    local missing_fork_output
+    local missing_fork_log
+    local uncloneable_status
+    local uncloneable_output
+    local uncloneable_log
+    local uncloneable_fork
+    local apply_missing_fork_dest
+    local apply_missing_fork_dest_branch
+    local apply_missing_fork_head
+    local apply_missing_fork_status
+    local apply_missing_fork_output
+    local apply_missing_fork_log
 
     echo "=== Test: sync-to-codex-plugin dry-run regression ==="
 
@@ -618,6 +686,13 @@ main() {
     write_bootstrap_destination_fixture "$bootstrap_dest"
     checkout_fixture_branch "$bootstrap_dest" "$bootstrap_dest_branch"
 
+    apply_missing_fork_dest="$TEST_ROOT/apply-missing-fork-destination"
+    apply_missing_fork_dest_branch="fixture/apply-missing-fork-target"
+    init_repo "$apply_missing_fork_dest"
+    write_destination_fixture "$apply_missing_fork_dest"
+    checkout_fixture_branch "$apply_missing_fork_dest" "$apply_missing_fork_dest_branch"
+    apply_missing_fork_head="$(git -C "$apply_missing_fork_dest" rev-parse HEAD)"
+
     write_fake_gh "$fake_bin"
 
     # This regression test is about dry-run content, so capture the preview
@@ -635,6 +710,22 @@ main() {
     dirty_apply_status=$?
     noop_apply_output="$(run_apply "$upstream" "$noop_apply_dest" "$fake_bin")"
     noop_apply_status=$?
+    dest_fake_bin="$TEST_ROOT/dest-bin"
+    dest_gh_log="$TEST_ROOT/dest-gh.log"
+    uncloneable_fork="missing-org/does-not-exist-codex-plugins"
+    : > "$dest_gh_log"
+    write_logging_fake_gh "$dest_fake_bin" "$dest_gh_log"
+    missing_fork_output="$(run_non_local_preview "$upstream" "$dest_fake_bin")"
+    missing_fork_status=$?
+    missing_fork_log="$(cat "$dest_gh_log")"
+    : > "$dest_gh_log"
+    uncloneable_output="$(run_non_local_preview_with_fork_env "$upstream" "$dest_fake_bin" "$uncloneable_fork")"
+    uncloneable_status=$?
+    uncloneable_log="$(cat "$dest_gh_log")"
+    : > "$dest_gh_log"
+    apply_missing_fork_output="$(run_local_apply_without_fork "$upstream" "$apply_missing_fork_dest" "$dest_fake_bin")"
+    apply_missing_fork_status=$?
+    apply_missing_fork_log="$(cat "$dest_gh_log")"
     missing_manifest_output="$(run_preview_without_manifest "$upstream" "$dest" "$fake_bin")"
     missing_manifest_status=$?
     set -e
@@ -642,8 +733,8 @@ main() {
     script_source="$(cat "$upstream/scripts/sync-to-codex-plugin.sh")"
     preview_section="$(printf '%s\n' "$preview_output" | sed -n '/^=== Preview (rsync --dry-run) ===$/,/^=== End preview ===$/p')"
     stale_preview_section="$(printf '%s\n' "$stale_preview_output" | sed -n '/^=== Preview (rsync --dry-run) ===$/,/^=== End preview ===$/p')"
-    dirty_skill_path="$dirty_apply_dest/plugins/superpowers/skills/example/SKILL.md"
-    noop_openai_metadata_path="$noop_apply_dest/plugins/superpowers/skills/example/agents/openai.yaml"
+    dirty_skill_path="$dirty_apply_dest/plugins/supersuit/skills/example/SKILL.md"
+    noop_openai_metadata_path="$noop_apply_dest/plugins/supersuit/skills/example/agents/openai.yaml"
 
     echo ""
     echo "Preview assertions..."
@@ -669,7 +760,7 @@ main() {
     assert_contains "$preview_section" "skills/example/SKILL.md" "Preview reflects dirty tracked destination file"
     assert_not_matches "$preview_section" "\\*deleting +skills/example/agents/openai\\.yaml" "Preview preserves destination-owned OpenAI agent metadata"
     assert_current_branch "$dest" "$dest_branch" "Preview leaves destination checkout on its original branch"
-    assert_branch_absent "$dest" "sync/superpowers-*" "Preview does not create sync branch in destination checkout"
+    assert_branch_absent "$dest" "sync/supersuit-*" "Preview does not create sync branch in destination checkout"
 
     echo ""
     echo "Mixed-directory assertions..."
@@ -686,26 +777,26 @@ main() {
     echo ""
     echo "Bootstrap assertions..."
     assert_equals "$bootstrap_status" "0" "Bootstrap preview exits successfully"
-    assert_contains "$bootstrap_output" "Mode:     BOOTSTRAP (creating plugins/superpowers/ when absent)" "Bootstrap preview describes directory creation"
+    assert_contains "$bootstrap_output" "Mode:     BOOTSTRAP (creating plugins/supersuit/ when absent)" "Bootstrap preview describes directory creation"
     assert_not_contains "$bootstrap_output" "Assets:" "Bootstrap preview omits external assets path"
     assert_contains "$bootstrap_output" "Dry run only. Nothing was changed or pushed." "Bootstrap preview remains dry-run only"
-    assert_path_absent "$bootstrap_dest/plugins/superpowers" "Bootstrap preview does not create destination plugin directory"
+    assert_path_absent "$bootstrap_dest/plugins/supersuit" "Bootstrap preview does not create destination plugin directory"
     assert_current_branch "$bootstrap_dest" "$bootstrap_dest_branch" "Bootstrap preview leaves destination checkout on its original branch"
-    assert_branch_absent "$bootstrap_dest" "bootstrap/superpowers-*" "Bootstrap preview does not create bootstrap branch in destination checkout"
+    assert_branch_absent "$bootstrap_dest" "bootstrap/supersuit-*" "Bootstrap preview does not create bootstrap branch in destination checkout"
 
     echo ""
     echo "Apply assertions..."
     assert_equals "$dirty_apply_status" "1" "Dirty local apply exits with failure"
-    assert_contains "$dirty_apply_output" "ERROR: local checkout has uncommitted changes under 'plugins/superpowers'" "Dirty local apply reports protected destination path"
+    assert_contains "$dirty_apply_output" "ERROR: local checkout has uncommitted changes under 'plugins/supersuit'" "Dirty local apply reports protected destination path"
     assert_current_branch "$dirty_apply_dest" "$dirty_apply_dest_branch" "Dirty local apply leaves destination checkout on its original branch"
-    assert_branch_absent "$dirty_apply_dest" "sync/superpowers-*" "Dirty local apply does not create sync branch in destination checkout"
+    assert_branch_absent "$dirty_apply_dest" "sync/supersuit-*" "Dirty local apply does not create sync branch in destination checkout"
     assert_file_equals "$dirty_skill_path" "# Example Skill
 
 Locally modified fixture content." "Dirty local apply preserves tracked working-tree file content"
     assert_equals "$noop_apply_status" "0" "Clean no-op local apply exits successfully"
     assert_contains "$noop_apply_output" "No changes — embedded plugin was already in sync with upstream" "Clean no-op local apply reports no changes"
     assert_current_branch "$noop_apply_dest" "$noop_apply_dest_branch" "Clean no-op local apply leaves destination checkout on its original branch"
-    assert_branch_absent "$noop_apply_dest" "sync/superpowers-*" "Clean no-op local apply does not create sync branch in destination checkout"
+    assert_branch_absent "$noop_apply_dest" "sync/supersuit-*" "Clean no-op local apply does not create sync branch in destination checkout"
     assert_file_equals "$noop_openai_metadata_path" "interface:
   display_name: \"Example\"
   short_description: \"Destination-owned OpenAI metadata\"" "Clean no-op local apply preserves OpenAI agent metadata"
@@ -718,12 +809,44 @@ Locally modified fixture content." "Dirty local apply preserves tracked working-
     echo ""
     echo "Help assertions..."
     assert_not_contains "$help_output" "--assets-src" "Help omits --assets-src"
+    assert_contains "$help_output" "--fork" "Help documents --fork dest"
+    assert_contains "$help_output" "CODEX_PLUGINS_FORK" "Help documents CODEX_PLUGINS_FORK dest"
+    assert_contains "$help_output" "must already exist" "Help says dest repo must already exist"
+    assert_not_contains "$help_output" "jeighty/openai-codex-plugins" "Help does not imply a default jeighty Codex plugins repo"
+
+    echo ""
+    echo "Destination dest-required assertions..."
+    assert_equals "$missing_fork_status" "1" "Non-local run without dest exits with failure"
+    assert_contains "$missing_fork_output" "CODEX_PLUGINS_FORK" "Missing dest names CODEX_PLUGINS_FORK"
+    assert_contains "$missing_fork_output" "--fork" "Missing dest names --fork"
+    assert_contains "$missing_fork_output" "must already exist" "Missing dest says dest repo must already exist"
+    assert_not_contains "$missing_fork_output" "Cloning " "Missing dest fails before clone"
+    assert_not_contains "$missing_fork_log" "repo clone" "Missing dest does not invoke gh repo clone"
+    assert_equals "$uncloneable_status" "1" "Non-local run with uncloneable dest exits with failure"
+    assert_contains "$uncloneable_output" "$uncloneable_fork" "Uncloneable dest names the dest repo"
+    assert_contains "$uncloneable_output" "must already exist" "Uncloneable dest says dest repo must already exist"
+    assert_not_contains "$uncloneable_output" "Cloning " "Uncloneable dest fails before clone"
+    assert_not_contains "$uncloneable_log" "repo clone" "Uncloneable dest does not invoke gh repo clone"
+    assert_equals "$apply_missing_fork_status" "1" "Local apply without dest exits with failure"
+    assert_contains "$apply_missing_fork_output" "CODEX_PLUGINS_FORK" "Local apply without dest names CODEX_PLUGINS_FORK"
+    assert_contains "$apply_missing_fork_output" "--fork" "Local apply without dest names --fork"
+    assert_contains "$apply_missing_fork_output" "must already exist" "Local apply without dest says dest repo must already exist"
+    assert_not_contains "$apply_missing_fork_output" "Pushing " "Local apply without dest fails before push"
+    assert_not_contains "$apply_missing_fork_output" "Opening PR..." "Local apply without dest fails before pr-create"
+    assert_not_contains "$apply_missing_fork_log" "pr create" "Local apply without dest does not invoke gh pr create"
+    assert_equals "$(git -C "$apply_missing_fork_dest" rev-parse HEAD)" "$apply_missing_fork_head" "Local apply without dest does not create a commit"
+    assert_current_branch "$apply_missing_fork_dest" "$apply_missing_fork_dest_branch" "Local apply without dest leaves destination checkout on its original branch"
+    assert_branch_absent "$apply_missing_fork_dest" "sync/supersuit-*" "Local apply without dest does not create sync branch"
+    assert_path_absent "$apply_missing_fork_dest/plugins/supersuit/.codex-plugin/plugin.json" "Local apply without dest does not sync plugin files"
 
     echo ""
     echo "Source assertions..."
     assert_not_contains "$script_source" "regenerated inline" "Source drops regenerated inline phrasing"
     assert_not_contains "$script_source" "Brand Assets directory" "Source drops Brand Assets directory phrasing"
     assert_not_contains "$script_source" "--assets-src" "Source drops --assets-src"
+    assert_not_contains "$script_source" "jeighty/openai-codex-plugins" "Source has no baked-in jeighty Codex plugins dest"
+    assert_not_contains "$script_source" "prime-radiant-inc/openai-codex-plugins" "Source has no baked-in Prime Radiant Codex plugins dest"
+    assert_not_matches "$script_source" 'CODEX_PLUGINS_FORK:-[^}"[:space:]]' "Source has no non-empty CODEX_PLUGINS_FORK default"
 
     if [[ $FAILURES -ne 0 ]]; then
         echo ""

@@ -2,27 +2,37 @@
 #
 # sync-to-codex-plugin.sh
 #
-# Sync this superpowers checkout → prime-radiant-inc/openai-codex-plugins.
-# Clones the fork fresh into a temp dir, rsyncs tracked upstream plugin content
-# (including committed Codex files under .codex-plugin/ and assets/), preserves
-# OpenAI-owned marketplace metadata already in the destination plugin, commits,
-# pushes a sync branch, and opens a PR.
-# Path/user agnostic — auto-detects upstream from script location.
+# Sync this supersuit checkout into a Codex plugins repo as plugins/supersuit.
+# This does not publish as upstream Superpowers and must not overwrite
+# Prime Radiant's plugins/superpowers listing.
+# Clones the destination repo fresh into a temp dir, rsyncs tracked plugin
+# content (including committed Codex files under .codex-plugin/ and assets/),
+# preserves OpenAI-owned marketplace metadata already in the destination
+# plugin, commits, pushes a sync branch, and opens a PR.
+# Path/user agnostic — auto-detects the source checkout from script location.
 #
-# Deterministic: running twice against the same upstream SHA produces PRs with
+# Deterministic: running twice against the same source SHA produces PRs with
 # identical diffs, so two back-to-back runs can verify the tool itself.
 #
 # Usage:
-#   ./scripts/sync-to-codex-plugin.sh                              # full run
-#   ./scripts/sync-to-codex-plugin.sh -n                           # dry run
-#   ./scripts/sync-to-codex-plugin.sh -y                           # skip confirm
+#   CODEX_PLUGINS_FORK=OWNER/REPO ./scripts/sync-to-codex-plugin.sh
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO            # full run
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO -n         # dry run
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO -y         # skip confirm
 #   ./scripts/sync-to-codex-plugin.sh --local PATH                 # existing checkout
-#   ./scripts/sync-to-codex-plugin.sh --base BRANCH                # default: main
-#   ./scripts/sync-to-codex-plugin.sh --bootstrap                  # create plugin dir if missing
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO --base BRANCH
+#   ./scripts/sync-to-codex-plugin.sh --fork OWNER/REPO --bootstrap
+#
+# Destination: a remote run requires CODEX_PLUGINS_FORK or --fork OWNER/REPO.
+# --local PATH is enough for dry-run (`-n`) and no-op apply. A real apply that
+# commits, pushes, or opens a PR still requires that dest. There is no default
+# dest repo. The dest must already exist; --bootstrap only creates
+# plugins/supersuit/ inside that dest, it does not create the dest repo.
 #
 # Bootstrap mode: skips the "plugin must exist on base" requirement and creates
-# plugins/superpowers/ when absent, then copies the tracked plugin files from
-# upstream just like a normal sync.
+# plugins/supersuit/ when absent, then copies the tracked plugin files from
+# this checkout just like a normal sync. Use --bootstrap only after that dest
+# exists.
 #
 # Requires: bash, rsync, git, gh (authenticated), python3.
 
@@ -32,9 +42,9 @@ set -euo pipefail
 # Config — edit as upstream or canonical plugin shape evolves
 # =============================================================================
 
-FORK="prime-radiant-inc/openai-codex-plugins"
+FORK="${CODEX_PLUGINS_FORK:-}"
 DEFAULT_BASE="main"
-DEST_REL="plugins/superpowers"
+DEST_REL="plugins/supersuit"
 
 # Paths in upstream that should NOT land in the embedded plugin.
 # All patterns use a leading "/" to anchor them to the source root.
@@ -154,6 +164,14 @@ while [[ $# -gt 0 ]]; do
     -n|--dry-run)  DRY_RUN=1; shift ;;
     -y|--yes)      YES=1; shift ;;
     --local)       LOCAL_CHECKOUT="$2"; shift 2 ;;
+    --fork)
+      if [[ $# -lt 2 || -z "${2:-}" || "$2" == -* ]]; then
+        echo "ERROR: --fork requires OWNER/REPO" >&2
+        usage 2
+      fi
+      FORK="$2"
+      shift 2
+      ;;
     --base)        BASE="$2"; shift 2 ;;
     --bootstrap)   BOOTSTRAP=1; shift ;;
     -h|--help)     usage 0 ;;
@@ -166,6 +184,16 @@ done
 # =============================================================================
 
 die() { echo "ERROR: $*" >&2; exit 1; }
+
+require_dest_repo() {
+  if [[ -z "$FORK" ]]; then
+    die "destination repo required: set CODEX_PLUGINS_FORK or pass --fork OWNER/REPO. The dest repo must already exist (use --bootstrap only after that dest exists)."
+  fi
+}
+
+if [[ -z "$LOCAL_CHECKOUT" ]]; then
+  require_dest_repo
+fi
 
 command -v rsync >/dev/null   || die "rsync not found in PATH"
 command -v git >/dev/null     || die "git not found in PATH"
@@ -220,6 +248,9 @@ if [[ -n "$LOCAL_CHECKOUT" ]]; then
   DEST_REPO="$(cd "$LOCAL_CHECKOUT" && pwd)"
   [[ -d "$DEST_REPO/.git" ]] || die "--local path '$DEST_REPO' is not a git checkout"
 else
+  if ! gh repo view "$FORK" >/dev/null 2>&1; then
+    die "destination repo '$FORK' is not cloneable (not found or not accessible). The dest repo must already exist (use --bootstrap only after that dest exists)."
+  fi
   echo "Cloning $FORK..."
   CLEANUP_DIR="$(mktemp -d)"
   DEST_REPO="$CLEANUP_DIR/openai-codex-plugins"
@@ -309,9 +340,9 @@ prepare_preview_checkout
 
 TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
 if [[ $BOOTSTRAP -eq 1 ]]; then
-  SYNC_BRANCH="bootstrap/superpowers-${UPSTREAM_SHORT}-${TIMESTAMP}"
+  SYNC_BRANCH="bootstrap/supersuit-${UPSTREAM_SHORT}-${TIMESTAMP}"
 else
-  SYNC_BRANCH="sync/superpowers-${UPSTREAM_SHORT}-${TIMESTAMP}"
+  SYNC_BRANCH="sync/supersuit-${UPSTREAM_SHORT}-${TIMESTAMP}"
 fi
 
 # =============================================================================
@@ -364,7 +395,7 @@ echo "Fork:     $FORK"
 echo "Base:     $BASE"
 echo "Branch:   $SYNC_BRANCH"
 if [[ $BOOTSTRAP -eq 1 ]]; then
-  echo "Mode:     BOOTSTRAP (creating plugins/superpowers/ when absent)"
+  echo "Mode:     BOOTSTRAP (creating plugins/supersuit/ when absent)"
 fi
 echo ""
 echo "=== Preview (rsync --dry-run) ==="
@@ -398,6 +429,10 @@ if [[ -n "$LOCAL_CHECKOUT" ]]; then
   fi
 fi
 
+# Real apply commits, pushes, and opens a PR against FORK. Require dest
+# before mutating the checkout. --local dry-run and no-op apply may omit it.
+require_dest_repo
+
 prepare_apply_checkout
 cd "$DEST_REPO"
 git checkout -q -b "$SYNC_BRANCH"
@@ -421,31 +456,31 @@ fi
 git add "$DEST_REL"
 
 if [[ $BOOTSTRAP -eq 1 ]]; then
-  COMMIT_TITLE="bootstrap superpowers v$UPSTREAM_VERSION from upstream main @ $UPSTREAM_SHORT"
-  PR_BODY="Initial bootstrap of the superpowers plugin from upstream \`main\` @ \`$UPSTREAM_SHORT\` (v$UPSTREAM_VERSION).
+  COMMIT_TITLE="bootstrap supersuit v$UPSTREAM_VERSION from jeighty/supersuit @ $UPSTREAM_SHORT"
+  PR_BODY="Initial bootstrap of the supersuit plugin from \`jeighty/supersuit\` \`main\` @ \`$UPSTREAM_SHORT\` (v$UPSTREAM_VERSION).
 
-Creates \`plugins/superpowers/\` by copying the tracked plugin files from upstream, including \`.codex-plugin/plugin.json\`, \`assets/\`, and \`hooks/\`.
+Creates \`plugins/supersuit/\` by copying the tracked plugin files from this checkout, including \`.codex-plugin/plugin.json\`, \`assets/\`, and \`hooks/\`.
 
 Run via: \`scripts/sync-to-codex-plugin.sh --bootstrap\`
-Upstream commit: https://github.com/obra/superpowers/commit/$UPSTREAM_SHA
+Source commit: https://github.com/jeighty/supersuit/commit/$UPSTREAM_SHA
 
-This is a one-time bootstrap. Subsequent syncs will be normal (non-bootstrap) runs using the same tracked upstream plugin files."
+This is a one-time bootstrap. Subsequent syncs will be normal (non-bootstrap) runs using the same tracked plugin files. This is not the upstream Superpowers listing."
 else
-  COMMIT_TITLE="sync superpowers v$UPSTREAM_VERSION from upstream main @ $UPSTREAM_SHORT"
-  PR_BODY="Automated sync from superpowers upstream \`main\` @ \`$UPSTREAM_SHORT\` (v$UPSTREAM_VERSION).
+  COMMIT_TITLE="sync supersuit v$UPSTREAM_VERSION from jeighty/supersuit @ $UPSTREAM_SHORT"
+  PR_BODY="Automated sync of Supersuit from \`jeighty/supersuit\` \`main\` @ \`$UPSTREAM_SHORT\` (v$UPSTREAM_VERSION).
 
-Copies the tracked plugin files from upstream, including the committed Codex manifest, assets, and hooks.
+Copies the tracked plugin files from this checkout, including the committed Codex manifest, assets, and hooks.
 
 Run via: \`scripts/sync-to-codex-plugin.sh\`
-Upstream commit: https://github.com/obra/superpowers/commit/$UPSTREAM_SHA
+Source commit: https://github.com/jeighty/supersuit/commit/$UPSTREAM_SHA
 
-Running the sync tool again against the same upstream SHA should produce a PR with an identical diff — use that to verify the tool is behaving."
+This publishes \`plugins/supersuit\`, not upstream Superpowers. Running the sync tool again against the same SHA should produce a PR with an identical diff — use that to verify the tool is behaving."
 fi
 
 git commit --quiet -m "$COMMIT_TITLE
 
 Automated sync via scripts/sync-to-codex-plugin.sh
-Upstream: https://github.com/obra/superpowers/commit/$UPSTREAM_SHA
+Source: https://github.com/jeighty/supersuit/commit/$UPSTREAM_SHA
 Branch:   $SYNC_BRANCH"
 
 echo "Pushing $SYNC_BRANCH to $FORK..."

@@ -81,7 +81,7 @@ function createPackagedServerFixture(version) {
   fs.mkdirSync(path.join(root, '.codex-plugin'), { recursive: true });
   fs.writeFileSync(
     path.join(root, '.codex-plugin/plugin.json'),
-    JSON.stringify({ name: 'superpowers', version }, null, 2)
+    JSON.stringify({ name: 'supersuit', version }, null, 2)
   );
   return {
     root,
