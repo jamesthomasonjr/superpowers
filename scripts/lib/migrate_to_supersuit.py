@@ -136,21 +136,25 @@ def migrate_paths(
             path.write_text(updated, encoding="utf-8")
 
     moves: list[tuple[Path, Path, str]] = []
+    seen_moves: set[tuple[Path, Path]] = set()
+
+    def add_move(src: Path, dest: Path) -> None:
+        label = plan_dir_move(src, dest)
+        if not label:
+            return
+        key = (src.resolve(), dest.resolve())
+        if key in seen_moves:
+            return
+        seen_moves.add(key)
+        moves.append((src, dest, label))
+
     for root in roots:
         if not root.is_dir():
             continue
-        src = root / LEGACY_DIRNAME
-        dest = root / CANONICAL_DIRNAME
-        label = plan_dir_move(src, dest)
-        if label:
-            moves.append((src, dest, label))
+        add_move(root / LEGACY_DIRNAME, root / CANONICAL_DIRNAME)
 
     if migrate_user:
-        src = user_home / LEGACY_DIRNAME
-        dest = user_home / CANONICAL_DIRNAME
-        label = plan_dir_move(src, dest)
-        if label:
-            moves.append((src, dest, label))
+        add_move(user_home / LEGACY_DIRNAME, user_home / CANONICAL_DIRNAME)
 
     for src, dest, label in moves:
         actions.append(label)

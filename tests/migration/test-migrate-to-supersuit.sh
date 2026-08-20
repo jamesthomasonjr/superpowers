@@ -212,6 +212,64 @@ else
   fail "does not move ~/.superpowers/ unless --user is set"
 fi
 
+# --- --user + project root == user_home: one move, exit 0 ---
+overlap_home="$TEST_ROOT/overlap-home"
+mkdir -p "$overlap_home/.superpowers"
+printf 'version: 1\n# use superpowers:writing-plans\n' >"$overlap_home/.superpowers/workflow.yaml"
+set +e
+"$SCRIPT_UNDER_TEST" --write --user --user-home "$overlap_home" "$overlap_home" \
+  >"$TEST_ROOT/overlap.out" 2>"$TEST_ROOT/overlap.err"
+overlap_status=$?
+set -e
+if [[ "$overlap_status" -eq 0 ]]; then
+  pass "--write --user with project root == user_home exits 0"
+else
+  fail "--write --user with project root == user_home exits 0"
+  echo "    exit: $overlap_status"
+  sed 's/^/    /' "$TEST_ROOT/overlap.err"
+fi
+if [[ -f "$overlap_home/.supersuit/workflow.yaml" && ! -d "$overlap_home/.superpowers" ]]; then
+  pass "overlap case performs a single home rename"
+else
+  fail "overlap case performs a single home rename"
+fi
+overlap_moves="$(grep -c '^  move ' "$TEST_ROOT/overlap.out" || true)"
+if [[ "$overlap_moves" -eq 1 ]]; then
+  pass "overlap case reports one move"
+else
+  fail "overlap case reports one move"
+  echo "    move lines: $overlap_moves"
+  sed 's/^/    /' "$TEST_ROOT/overlap.out"
+fi
+
+# --- distinct project root + --user still moves both ---
+distinct_home="$TEST_ROOT/distinct-home"
+distinct_proj="$TEST_ROOT/distinct-proj"
+mkdir -p "$distinct_home/.superpowers" "$distinct_proj/.superpowers"
+printf 'home-overlay\n' >"$distinct_home/.superpowers/workflow.yaml"
+printf 'proj-overlay\n' >"$distinct_proj/.superpowers/workflow.yaml"
+if ! "$SCRIPT_UNDER_TEST" --write --user --user-home "$distinct_home" "$distinct_proj" \
+  >"$TEST_ROOT/distinct.out" 2>"$TEST_ROOT/distinct.err"; then
+  fail "distinct project + --user exits 0"
+  sed 's/^/    /' "$TEST_ROOT/distinct.err"
+else
+  pass "distinct project + --user exits 0"
+fi
+if [[ -f "$distinct_home/.supersuit/workflow.yaml" && ! -d "$distinct_home/.superpowers" &&
+      -f "$distinct_proj/.supersuit/workflow.yaml" && ! -d "$distinct_proj/.superpowers" ]]; then
+  pass "distinct project + --user moves both dirs"
+else
+  fail "distinct project + --user moves both dirs"
+fi
+distinct_moves="$(grep -c '^  move ' "$TEST_ROOT/distinct.out" || true)"
+if [[ "$distinct_moves" -eq 2 ]]; then
+  pass "distinct project + --user reports two moves"
+else
+  fail "distinct project + --user reports two moves"
+  echo "    move lines: $distinct_moves"
+  sed 's/^/    /' "$TEST_ROOT/distinct.out"
+fi
+
 # --- dest exists: do not clobber ---
 both="$TEST_ROOT/both"
 mkdir -p "$both/.superpowers" "$both/.supersuit"
