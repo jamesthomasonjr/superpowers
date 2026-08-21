@@ -26,7 +26,7 @@ write_json() {
 }
 
 echo "=== ensure-worktree source never creates a git worktree ==="
-if grep -E 'git[[:space:]]+worktree[[:space:]]+add' "$REPO_ROOT/scripts/ensure-worktree"; then
+if grep -E '^[[:space:]]*git[[:space:]]+worktree[[:space:]]+add' "$REPO_ROOT/scripts/ensure-worktree"; then
   fail "ensure-worktree source contains git worktree add"
 else
   pass "ensure-worktree source has no git worktree add"

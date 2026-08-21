@@ -2,7 +2,7 @@
 # Deterministic workspace handshake for hosts that advertise native-worktree.
 #
 # The host (harness or external app) owns workspace / worktree creation.
-# This script must never run `git worktree add` or any other create step.
+# This script is a handshake only — it must never create a worktree.
 # It reports isolation if already present, then exits 0 (complete).
 
 set -euo pipefail
