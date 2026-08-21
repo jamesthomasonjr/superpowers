@@ -9,6 +9,7 @@ Config layers live under **`.supersuit/`** (canonical). Leftover `.superpowers/`
 - [Deterministic run/exec actions](superpowers/specs/2026-08-17-workflow-run-actions-design.md)
 - [Capability-aware overlays](superpowers/specs/2026-08-17-workflow-capability-overlays-design.md)
 - [Harness/external workspace preference](superpowers/specs/2026-08-21-native-worktree-preference-design.md)
+- [Visual-surface capability ladder](superpowers/specs/2026-08-21-visual-surface-ladder-design.md)
 
 ## Layer precedence
 
@@ -184,7 +185,7 @@ SessionStart passes `--detect-capabilities` and honors `SUPERPOWERS_CAPABILITIES
 | `native-worktree` | Host owns worktree / workspace creation. | No. Advertise explicitly. Product name is not evidence. See [Advertising `native-worktree`](#advertising-native-worktree). |
 | `subagents` | Host supports subagent dispatch. | No. Advertise explicitly. |
 | `exec-hook` | Host can run deterministic workflow actions without the chat model mediating. | No. SessionStart running is not the same as an exec hook. |
-| `native-canvas` | Host provides a native visual surface (e.g. Cursor Canvas). | No. Do not infer from `CURSOR_PLUGIN_ROOT`. |
+| `native-canvas` | Host provides a native visual surface (e.g. Cursor Canvas). | No. Do not infer from `CURSOR_PLUGIN_ROOT`. See [Advertising `native-canvas`](#advertising-native-canvas). |
 
 A missing capability probe (no hook env, no env override, no `--capabilities`) yields an empty set. Gated overlays do not apply. That is intentional: fail toward the Superpowers baseline rather than claiming Canvas, worktrees, subagents, or exec hooks from a product name.
 
@@ -251,6 +252,54 @@ skills:
       capabilities:
         - native-worktree
 ```
+
+## Advertising `native-canvas`
+
+Hosts that provide a native visual surface (Cursor Canvas or equivalent)
+should **advertise** `native-canvas`. Do not infer it from the product
+name. The user-facing brainstorming offer stays product-agnostic
+("visual surface"); operational chat may name the chosen surface once
+after the user accepts.
+
+```bash
+export SUPERPOWERS_CAPABILITIES=native-canvas
+```
+
+Or pass it on the CLI (and forward the resolved map's `capabilities` list
+into `run-workflow-action` so the token cannot drop):
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" \
+  --user-home "$HOME" --capabilities native-canvas --pretty
+
+./scripts/run-workflow-action --id visual-surface --plugin-root "$PWD" \
+  --project-root "$PWD" --user-home "$HOME" --capabilities native-canvas
+```
+
+SessionStart already honors `SUPERPOWERS_CAPABILITIES` and always passes
+`--detect-capabilities`. Detect still only adds `session-inject` from hook
+env. `native-canvas` must be in the env or `--capabilities`.
+
+When the token is advertised, the bundled overlay
+`workflows/overlays/native-canvas.yaml` remaps `visual-surface` after the
+user accepts the offer. This is **not** a pipeline handoff after
+`approved-architectural` — selection happens mid-brainstorming.
+
+| Without `native-canvas` (and no user/project overlay) | With `native-canvas` advertised |
+|------------------------------------------------------|--------------------------------|
+| `visual-surface` is the identity skill (companion-server portable default) | remapped to `scripts/select-visual-surface` (`run`) |
+| Agent reads `supersuit:visual-surface` and starts the companion server on accept | Outcome `native` → native surface; `companion` → companion server; `text` → chat only |
+| Declined offer is text-only | Same — decline never starts a surface |
+
+`scripts/select-visual-surface` never invents `native-canvas` from Cursor,
+Claude, Codex, or other product names. Hosts that want a different
+selector override the registry entry with the **same**
+`when.capabilities: [native-canvas]` signature in
+`.supersuit/workflow.yaml`.
+
+Policy (JIT offer, own-message, per-question visual vs text) stays in
+`skills/brainstorming/SKILL.md`. Mechanics live in
+`skills/visual-surface/`.
 
 ## Example: replace brainstorming with a custom skill path
 
