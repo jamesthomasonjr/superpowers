@@ -286,7 +286,7 @@ To rewire handoffs or replace a skill, add:
 
 Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
 
-Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps, and **`when.capabilities`** gates for progressive enhancement — see the workflow config docs. The bundled default graph does not include run actions or capability gates.
+Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps, and **`when.capabilities`** gates for progressive enhancement — see the workflow config docs. `workflows/default.yaml` stays ungated and Superpowers-shaped. A bundled overlay prefers `ensure-worktree` when the host **advertises** `native-worktree` (never inferred from a product name).
 
 Inspect the merged map:
 
@@ -331,8 +331,10 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 
 **Workflow**
 - **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
+- **`workflows/overlays/native-worktree.yaml`** - Gated `ensure-worktree` run when `native-worktree` is advertised
 - **`scripts/resolve-workflow`** - Merge and validate overlays
 - **`scripts/run-workflow-action`** - Execute a deterministic `run`/`exec` registry entry
+- **`scripts/ensure-worktree`** - Host-owned workspace handshake (never `git worktree add`)
 - **`scripts/migrate-to-supersuit`** - One-time Superpowers → Supersuit rewrite + dir move
 
 ## Philosophy

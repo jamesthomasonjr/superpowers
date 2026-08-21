@@ -179,6 +179,37 @@ def overlay_workflow_path(root: Path) -> Path | None:
     return None
 
 
+def bundled_overlay_paths(plugin_root: Path) -> list[Path]:
+    """Return bundled capability overlays, sorted by filename.
+
+    These are plugin config (always loaded, including ``--bundled-only``),
+    not user/project overlays. Files must be ``*.yaml`` or ``*.yml``.
+    """
+    overlay_dir = plugin_root / "workflows" / "overlays"
+    if not overlay_dir.is_dir():
+        return []
+    return sorted(
+        path
+        for path in overlay_dir.iterdir()
+        if path.is_file() and path.suffix in {".yaml", ".yml"}
+    )
+
+
+def load_workflow_mapping(path: Path, *, label: str) -> dict[str, Any]:
+    """Read and parse a workflow YAML mapping, or raise WorkflowResolveError."""
+    try:
+        doc = load_yaml(path.read_text())
+    except OSError as exc:
+        raise WorkflowResolveError(f"failed to read {label}: {exc}") from exc
+    except YAMLError as exc:
+        raise WorkflowResolveError(f"failed to parse {label}: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise WorkflowResolveError(
+            f"{label} must be a mapping, got {type(doc).__name__}"
+        )
+    return doc
+
+
 def discover_known_skills(plugin_root: Path) -> list[str]:
     """Return bundled skill directory names that contain SKILL.md."""
     skills_dir = plugin_root / "skills"
@@ -726,51 +757,25 @@ def resolve_workflow(
 ) -> dict[str, Any]:
     """Load, merge, validate, and return the resolved workflow graph."""
     default_path = plugin_root / "workflows" / "default.yaml"
-    try:
-        merged = load_yaml(default_path.read_text())
-    except OSError as exc:
-        raise WorkflowResolveError(f"failed to read bundled workflow: {exc}") from exc
-    except YAMLError as exc:
-        raise WorkflowResolveError(f"failed to parse bundled workflow: {exc}") from exc
+    merged = load_workflow_mapping(default_path, label="bundled workflow")
 
-    if not isinstance(merged, dict):
-        raise WorkflowResolveError("bundled workflow must be a mapping")
+    for overlay_path in bundled_overlay_paths(plugin_root):
+        overlay_doc = load_workflow_mapping(
+            overlay_path, label=f"bundled overlay {overlay_path.name}"
+        )
+        merged = merge_workflows(merged, overlay_doc)
 
     if not bundled_only:
         user_path = overlay_workflow_path(user_home)
         if user_path is not None:
-            try:
-                user_doc = load_yaml(user_path.read_text())
-            except OSError as exc:
-                raise WorkflowResolveError(
-                    f"failed to read user workflow: {exc}"
-                ) from exc
-            except YAMLError as exc:
-                raise WorkflowResolveError(
-                    f"failed to parse user workflow: {exc}"
-                ) from exc
-            if not isinstance(user_doc, dict):
-                raise WorkflowResolveError(
-                    f"user workflow must be a mapping, got {type(user_doc).__name__}"
-                )
+            user_doc = load_workflow_mapping(user_path, label="user workflow")
             merged = merge_workflows(merged, user_doc)
 
         project_path = overlay_workflow_path(project_root)
         if project_path is not None:
-            try:
-                project_doc = load_yaml(project_path.read_text())
-            except OSError as exc:
-                raise WorkflowResolveError(
-                    f"failed to read project workflow: {exc}"
-                ) from exc
-            except YAMLError as exc:
-                raise WorkflowResolveError(
-                    f"failed to parse project workflow: {exc}"
-                ) from exc
-            if not isinstance(project_doc, dict):
-                raise WorkflowResolveError(
-                    f"project workflow must be a mapping, got {type(project_doc).__name__}"
-                )
+            project_doc = load_workflow_mapping(
+                project_path, label="project workflow"
+            )
             merged = merge_workflows(merged, project_doc)
 
     bundled_skills = set(discover_known_skills(plugin_root))

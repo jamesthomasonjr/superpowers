@@ -8,14 +8,16 @@ Config layers live under **`.supersuit/`** (canonical). Leftover `.superpowers/`
 - [Configurable workflow graph](superpowers/specs/2026-08-16-configurable-workflow-graph-design.md)
 - [Deterministic run/exec actions](superpowers/specs/2026-08-17-workflow-run-actions-design.md)
 - [Capability-aware overlays](superpowers/specs/2026-08-17-workflow-capability-overlays-design.md)
+- [Harness/external workspace preference](superpowers/specs/2026-08-21-native-worktree-preference-design.md)
 
 ## Layer precedence
 
 Configs merge in order (lowest → highest precedence):
 
 1. **Bundled defaults** — `workflows/default.yaml` in the plugin
-2. **User overlay** — `~/.supersuit/workflow.yaml`, or `~/.superpowers/workflow.yaml` if the canonical file is absent
-3. **Project overlay** — `.supersuit/workflow.yaml` in the project root, or `.superpowers/workflow.yaml` if the canonical file is absent
+2. **Bundled capability overlays** — `workflows/overlays/*.yaml` (sorted by name). Always loaded, including with `--bundled-only`. Gated entries apply only when the matching capability is advertised.
+3. **User overlay** — `~/.supersuit/workflow.yaml`, or `~/.superpowers/workflow.yaml` if the canonical file is absent
+4. **Project overlay** — `.supersuit/workflow.yaml` in the project root, or `.superpowers/workflow.yaml` if the canonical file is absent
 
 `.supersuit/` is the long-term name. `.superpowers/` is a compatibility fallback, not a second overlay layer: each of user and project picks **one** file (canonical wins). New writes go to `.supersuit/`. See [Migrating from Superpowers](migrating-from-superpowers.md).
 
@@ -58,7 +60,7 @@ A registry entry may set only one of `run`/`exec`, `path`, or `skill`.
 
 ## Deterministic run / exec actions
 
-Mechanical steps (ensure a worktree, lay out paths, etc.) can be registry entries that run an allowlisted argv instead of an LLM skill. The bundled default graph does **not** include any `run` actions — add them only via overlays.
+Mechanical steps (ensure a worktree, lay out paths, etc.) can be registry entries that run an allowlisted argv instead of an LLM skill. `workflows/default.yaml` itself has no `run` actions. A bundled capability overlay adds `ensure-worktree` only when `native-worktree` is advertised (see below). Other run actions still belong in user/project overlays.
 
 ```yaml
 version: 1
@@ -179,12 +181,76 @@ SessionStart passes `--detect-capabilities` and honors `SUPERPOWERS_CAPABILITIES
 | Token | Meaning | Auto-detected? |
 |-------|---------|----------------|
 | `session-inject` | Host injects bootstrap / workflow map at session start. | Yes, when `CURSOR_PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, or `COPILOT_CLI` is set (SessionStart-like env). |
-| `native-worktree` | Host owns worktree / workspace creation. | No. Advertise explicitly. Product name is not evidence. |
+| `native-worktree` | Host owns worktree / workspace creation. | No. Advertise explicitly. Product name is not evidence. See [Advertising `native-worktree`](#advertising-native-worktree). |
 | `subagents` | Host supports subagent dispatch. | No. Advertise explicitly. |
 | `exec-hook` | Host can run deterministic workflow actions without the chat model mediating. | No. SessionStart running is not the same as an exec hook. |
 | `native-canvas` | Host provides a native visual surface (e.g. Cursor Canvas). | No. Do not infer from `CURSOR_PLUGIN_ROOT`. |
 
 A missing capability probe (no hook env, no env override, no `--capabilities`) yields an empty set. Gated overlays do not apply. That is intentional: fail toward the Superpowers baseline rather than claiming Canvas, worktrees, subagents, or exec hooks from a product name.
+
+## Advertising `native-worktree`
+
+Hosts that already create the workspace (Cursor Cloud worktrees, an external
+app, a harness-native `EnterWorktree` / equivalent) should **advertise**
+`native-worktree`. Do not infer it from the product name.
+
+```bash
+export SUPERPOWERS_CAPABILITIES=native-worktree
+```
+
+Or pass it on the CLI (and forward the resolved map's `capabilities` list
+into `run-workflow-action` so the token cannot drop):
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" \
+  --user-home "$HOME" --capabilities native-worktree --pretty
+
+./scripts/run-workflow-action --id ensure-worktree --plugin-root "$PWD" \
+  --project-root "$PWD" --user-home "$HOME" --capabilities native-worktree
+```
+
+SessionStart already honors `SUPERPOWERS_CAPABILITIES` and always passes
+`--detect-capabilities`. Detect still only adds `session-inject` from hook
+env. `native-worktree` must be in the env or `--capabilities`.
+
+When the token is advertised, the bundled overlay
+`workflows/overlays/native-worktree.yaml` wins over the Superpowers baseline:
+
+| Without `native-worktree` (and no user/project overlay) | With `native-worktree` advertised |
+|--------------------------------------------------------|----------------------------------|
+| `brainstorming / approved-architectural` → `writing-plans` | → `ensure-worktree` (run), then `writing-plans` on `complete` |
+| `using-git-worktrees` is the Superpowers identity skill | remapped to the same `run` (`complete` → `null`) |
+| Agent may still follow `supersuit:using-git-worktrees` | Do not load that skill or invent `git worktree` steps |
+
+`scripts/ensure-worktree` is a handshake, not a creator. It never runs
+`git worktree add`. Hosts that want a stricter check (must already be
+isolated, or call a native tool) override the registry entry with the
+**same** `when.capabilities: [native-worktree]` signature in
+`.supersuit/workflow.yaml` — later layers upsert the same gate:
+
+```yaml
+version: 1
+
+skills:
+  ensure-worktree:
+    run:
+      argv:
+        - scripts/my-ensure-worktree.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - native-worktree
+  using-git-worktrees:
+    run:
+      argv:
+        - scripts/my-ensure-worktree.sh
+      allow:
+        - project
+    when:
+      capabilities:
+        - native-worktree
+```
 
 ## Example: replace brainstorming with a custom skill path
 

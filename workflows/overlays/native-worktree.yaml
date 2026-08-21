@@ -1,0 +1,56 @@
+# Bundled capability overlay (issue #7).
+# Always merged after workflows/default.yaml. Gated entries apply only when
+# native-worktree is advertised — never inferred from a product name.
+version: 1
+
+skills:
+  ensure-worktree:
+    run:
+      argv:
+        - scripts/ensure-worktree
+      allow:
+        - plugin
+    when:
+      capabilities:
+        - native-worktree
+  using-git-worktrees:
+    run:
+      argv:
+        - scripts/ensure-worktree
+      allow:
+        - plugin
+    when:
+      capabilities:
+        - native-worktree
+
+transitions:
+  - from: brainstorming
+    on: approved-architectural
+    to: ensure-worktree
+    when:
+      capabilities:
+        - native-worktree
+  - from: ensure-worktree
+    on: complete
+    to: writing-plans
+    when:
+      capabilities:
+        - native-worktree
+  - from: ensure-worktree
+    on: failed
+    to: wait
+    when:
+      capabilities:
+        - native-worktree
+  - from: using-git-worktrees
+    on: complete
+    to: null
+    when:
+      capabilities:
+        - native-worktree
+  - from: using-git-worktrees
+    on: failed
+    to: wait
+    when:
+      capabilities:
+        - native-worktree

@@ -885,6 +885,7 @@ else
 fi
 
 echo "=== ambiguous equally-specific transitions fail ==="
+# Use tokens that are not also gated in bundled overlays (native-worktree is).
 AMBIG="$TEST_ROOT/ambig-proj"
 mkdir -p "$AMBIG/.supersuit"
 cat > "$AMBIG/.supersuit/workflow.yaml" <<'EOF'
@@ -901,9 +902,9 @@ transitions:
     to: writing-plans
     when:
       capabilities:
-        - native-worktree
+        - subagents
 EOF
-if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$AMBIG" --user-home "$TEST_HOME" --capabilities exec-hook,native-worktree >/dev/null 2>"$TEST_ROOT/err-ambig.txt"; then
+if "$REPO_ROOT/scripts/resolve-workflow" --plugin-root "$REPO_ROOT" --project-root "$AMBIG" --user-home "$TEST_HOME" --capabilities exec-hook,subagents >/dev/null 2>"$TEST_ROOT/err-ambig.txt"; then
   fail "ambiguous equally-specific transitions fail"
 else
   if grep -qi 'ambiguous' "$TEST_ROOT/err-ambig.txt"; then
