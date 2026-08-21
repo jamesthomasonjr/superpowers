@@ -49,6 +49,9 @@ Rules:
    `capabilities`, pass them through: `--capabilities` plus those tokens — so
    advertised tokens cannot drift off `session-inject`. Read the JSON
    `outcome`, then continue the map for `(from=<id>, on=<outcome>)`.
+   If `native-worktree` is in the map's `capabilities`, `using-git-worktrees`
+   and `ensure-worktree` are `run` actions. Do not load the worktree skill
+   and do not invent `git worktree` steps — the host owns workspace setup.
 5. `to: null` — no pipeline handoff; continue the session. Description-triggered
    skills (TDD, debugging, verification, etc.) still apply.
 6. `to: wait` — stop and ask your human partner what to do next.

@@ -5,8 +5,9 @@
 **Depends on:** Configurable workflow graph (#4); pairs with deterministic
 run/exec actions (#5 / PR #10). Config dirs are `.supersuit/` /
 `~/.supersuit/` with one-release `.superpowers/` read fallback (#16).
-**Enables later (not this change):** Canvas-vs-companion selection (#9),
-harness workspace preference (#7). Those issues stay follow-ups.
+**Enables later (not this change):** Canvas-vs-companion selection (#9).
+Harness workspace preference (#7) is a follow-up that uses these gates
+(`docs/superpowers/specs/2026-08-21-native-worktree-preference-design.md`).
 
 ## Problem
 

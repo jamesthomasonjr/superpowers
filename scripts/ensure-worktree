@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Deterministic workspace handshake for hosts that advertise native-worktree.
+#
+# The host (harness or external app) owns workspace / worktree creation.
+# This script must never run `git worktree add` or any other create step.
+# It reports isolation if already present, then exits 0 (complete).
+
+set -euo pipefail
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "ensure-worktree: workspace is host-owned; not a git checkout"
+  exit 0
+fi
+
+git_dir=$(cd "$(git rev-parse --git-dir)" && pwd -P)
+git_common=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)
+superproject=$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)
+
+if [[ -z "${superproject}" && "${git_dir}" != "${git_common}" ]]; then
+  root=$(pwd -P)
+  branch=$(git branch --show-current 2>/dev/null || true)
+  if [[ -n "${branch}" ]]; then
+    echo "ensure-worktree: already isolated at ${root} on branch ${branch}"
+  else
+    echo "ensure-worktree: already isolated at ${root} (detached HEAD, host-managed)"
+  fi
+  exit 0
+fi
+
+echo "ensure-worktree: workspace is host-owned; not creating a git worktree"
+exit 0

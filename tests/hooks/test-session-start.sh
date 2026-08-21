@@ -227,10 +227,21 @@ assert_command_output \
     "Cursor injects WORKFLOW_MAP with resolved transitions" \
     "cursor" \
     "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject" \
+    "native-canvas"$'\037'"\"to\": \"ensure-worktree\"" \
+    "$cursor_home" \
+    CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    bash "$HOOK_UNDER_TEST"
+
+assert_command_output \
+    "SessionStart with SUPERPOWERS_CAPABILITIES=native-worktree injects ensure-worktree" \
+    "cursor" \
+    "WORKFLOW_MAP"$'\037'"\"to\": \"ensure-worktree\""$'\037'"\"capabilities\": [\"session-inject\", \"native-worktree\"]" \
     "native-canvas" \
     "$cursor_home" \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    SUPERPOWERS_CAPABILITIES=native-worktree \
     bash "$HOOK_UNDER_TEST"
 
 bad_proj="$TEST_ROOT/bad-workflow-proj"
