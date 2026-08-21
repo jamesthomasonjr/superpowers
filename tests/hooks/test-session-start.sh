@@ -244,6 +244,17 @@ assert_command_output \
     SUPERPOWERS_CAPABILITIES=native-worktree \
     bash "$HOOK_UNDER_TEST"
 
+assert_command_output \
+    "SessionStart with SUPERPOWERS_CAPABILITIES=native-canvas remaps visual-surface" \
+    "cursor" \
+    "WORKFLOW_MAP"$'\037'"\"capabilities\": [\"session-inject\", \"native-canvas\"]"$'\037'"select-visual-surface" \
+    "\"to\": \"ensure-worktree\"" \
+    "$cursor_home" \
+    CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    SUPERPOWERS_CAPABILITIES=native-canvas \
+    bash "$HOOK_UNDER_TEST"
+
 bad_proj="$TEST_ROOT/bad-workflow-proj"
 mkdir -p "$bad_proj/.superpowers"
 echo 'version: "nope"' > "$bad_proj/.superpowers/workflow.yaml"

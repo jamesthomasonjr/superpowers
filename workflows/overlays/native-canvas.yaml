@@ -1,0 +1,42 @@
+# Bundled capability overlay (issues #8 / #9).
+# Always merged after workflows/default.yaml. Gated entries apply only when
+# native-canvas is advertised — never inferred from a product name.
+# Visual-surface selection is mid-brainstorming, not a pipeline handoff.
+version: 1
+
+skills:
+  visual-surface:
+    run:
+      argv:
+        - scripts/select-visual-surface
+        - --capabilities
+        - native-canvas
+      allow:
+        - plugin
+      outcomes:
+        0: native
+        10: companion
+        20: text
+    when:
+      capabilities:
+        - native-canvas
+
+transitions:
+  - from: visual-surface
+    on: native
+    to: null
+    when:
+      capabilities:
+        - native-canvas
+  - from: visual-surface
+    on: companion
+    to: null
+    when:
+      capabilities:
+        - native-canvas
+  - from: visual-surface
+    on: text
+    to: null
+    when:
+      capabilities:
+        - native-canvas

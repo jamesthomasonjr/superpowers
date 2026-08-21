@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Deterministic visual-surface ladder (issues #8 / #9).
+#
+# Prefer an advertised native visual surface, then the portable companion
+# server, then text-only. Never infer native-canvas from product names.
+#
+# Exit codes (workflow run outcomes):
+#   0  native
+#   10 companion
+#   20 text
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB_DIR="${SCRIPT_DIR}/lib"
+
+ACCEPTED="yes"
+AVAILABLE="auto"
+DETECT="false"
+CLI_CAPS=""
+
+usage() {
+  cat <<'EOF'
+Usage: select-visual-surface [--accepted yes|no] [--available yes|no|auto]
+                             [--capabilities TOKENS] [--detect-capabilities]
+
+Prints {"surface":"native"|"companion"|"text"} and exits 0/10/20.
+
+native-canvas must be advertised via --capabilities or SUPERPOWERS_CAPABILITIES.
+Detect only claims session-inject from SessionStart-like env. Product names
+(Cursor, Claude, Codex, …) are not capabilities.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --accepted)
+      ACCEPTED="$2"
+      shift 2
+      ;;
+    --available)
+      AVAILABLE="$2"
+      shift 2
+      ;;
+    --capabilities)
+      CLI_CAPS="$2"
+      shift 2
+      ;;
+    --detect-capabilities)
+      DETECT="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "{\"error\":\"unknown argument: $1\"}" >&2
+      exit 2
+      ;;
+  esac
+done
+
+case "$ACCEPTED" in
+  yes|no) ;;
+  *)
+    echo "{\"error\":\"--accepted must be yes or no\"}" >&2
+    exit 2
+    ;;
+esac
+
+case "$AVAILABLE" in
+  yes|no|auto) ;;
+  *)
+    echo "{\"error\":\"--available must be yes, no, or auto\"}" >&2
+    exit 2
+    ;;
+esac
+
+CAPS="$(
+  DETECT_FLAG="$DETECT" CLI_CAPS="$CLI_CAPS" python3 - "$LIB_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+from workflow_resolve import detect_capabilities, merge_capability_sets, parse_capabilities
+
+groups = []
+if os.environ.get("DETECT_FLAG") == "true":
+    groups.append(detect_capabilities())
+groups.append(parse_capabilities(os.environ.get("SUPERPOWERS_CAPABILITIES")))
+groups.append(parse_capabilities(os.environ.get("CLI_CAPS")))
+print(",".join(merge_capability_sets(*groups)))
+PY
+)"
+
+has_native="false"
+IFS=',' read -r -a CAP_ARR <<< "$CAPS"
+for token in "${CAP_ARR[@]}"; do
+  if [[ "$token" == "native-canvas" ]]; then
+    has_native="true"
+    break
+  fi
+done
+
+emit() {
+  local surface="$1"
+  local code="$2"
+  printf '{"surface":"%s"}\n' "$surface"
+  exit "$code"
+}
+
+if [[ "$ACCEPTED" == "no" ]]; then
+  emit text 20
+fi
+
+if [[ "$has_native" == "true" && "$AVAILABLE" != "no" ]]; then
+  emit native 0
+fi
+
+if [[ "$has_native" == "true" && "$AVAILABLE" == "no" ]]; then
+  emit companion 10
+fi
+
+if [[ "$AVAILABLE" == "no" ]]; then
+  emit text 20
+fi
+
+emit companion 10
