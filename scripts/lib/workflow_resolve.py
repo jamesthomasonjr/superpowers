@@ -1041,6 +1041,39 @@ def write_pending_handoff(project_root: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _normalize_session_id(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    sid = value.strip()
+    return sid or None
+
+
+def queue_session_id(explicit: str | None = None) -> str | None:
+    """Session id for --queue: --session-id, else CLAUDE_SESSION_ID if already set.
+
+    Claude Stop stdin has ``session_id``; Bash tool contexts do not reliably
+    export it. We do not invent a token.
+    """
+    sid = _normalize_session_id(explicit)
+    if sid:
+        return sid
+    return _normalize_session_id(os.environ.get("CLAUDE_SESSION_ID"))
+
+
+def session_ids_compatible(file_sid: Any, request_sid: str | None) -> bool:
+    """Fail-closed pending-handoff isolation.
+
+    Claim only when both sides have the same id, or both have none
+    (legacy project-global). A scoped Stop must not consume an unscoped
+    file; an unscoped Stop must not consume a scoped file.
+    """
+    file_n = _normalize_session_id(file_sid)
+    req_n = _normalize_session_id(request_sid)
+    if file_n is None and req_n is None:
+        return True
+    return file_n is not None and req_n is not None and file_n == req_n
+
+
 def load_pending_handoff(
     project_root: Path, session_id: str | None = None
 ) -> dict[str, Any] | None:
@@ -1054,7 +1087,7 @@ def load_pending_handoff(
     if not isinstance(data, dict):
         return None
     file_sid = data.get("session_id") or data.get("sessionId")
-    if session_id and file_sid and str(file_sid) != str(session_id):
+    if not session_ids_compatible(file_sid, session_id):
         return None
     return data
 
@@ -1309,6 +1342,15 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--session-id",
+        dest="session_id",
+        help=(
+            "Scope a queued pending-handoff to this session. Required for "
+            "--queue unless CLAUDE_SESSION_ID is already set. Do not invent "
+            "a token — use Stop/SessionStart session_id."
+        ),
+    )
+    parser.add_argument(
         "--plugin-root",
         help="Plugin root (default: SUPERPOWERS_PLUGIN_ROOT or repository root)",
     )
@@ -1392,7 +1434,15 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         if not args.id and not (args.from_id and args.on):
             print("--queue requires --id or --from/--on", file=sys.stderr)
             return 1
-        queued: dict[str, Any] = {}
+        session_id = queue_session_id(args.session_id)
+        if not session_id:
+            print(
+                "--queue requires --session-id or CLAUDE_SESSION_ID "
+                "(do not invent a session token)",
+                file=sys.stderr,
+            )
+            return 1
+        queued: dict[str, Any] = {"session_id": session_id}
         if args.id:
             queued["id"] = args.id
         if args.from_id:
@@ -1424,6 +1474,13 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         return 1
 
     hook_event = _is_hook_event(payload) and not cli_target
+    explicit_exec = bool(args.id or args.from_id or args.on)
+    # Superpowers baseline: a normal Stop with no queued work is silent idle,
+    # even when exec-hook is not advertised. Missing exec-hook is only a hook
+    # failure when this Stop claimed a pending file or an explicit exec was
+    # requested.
+    if hook_event and not claimed_pending and not explicit_exec:
+        return 0
 
     def _finish_pending(mode: str | None) -> None:
         if not claimed_pending:

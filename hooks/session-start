@@ -7,6 +7,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# Persist the real SessionStart session_id for later --queue isolation.
+# Claude Stop stdin has session_id; Bash tool contexts do not reliably export
+# CLAUDE_SESSION_ID. We do not invent a token — only stdin or an already-set env.
+if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ]; then
+    _supersuit_sid=""
+    if [ ! -t 0 ]; then
+        _supersuit_sid="$(python3 -c '
+import json, re, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+raw = data.get("session_id") or data.get("sessionId") or ""
+if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9._:-]+", raw.strip()):
+    sys.stdout.write(raw.strip())
+' 2>/dev/null || true)"
+    fi
+    if [ -n "$_supersuit_sid" ]; then
+        if [ ! -f "$CLAUDE_ENV_FILE" ] || ! grep -q '^CLAUDE_SESSION_ID=' "$CLAUDE_ENV_FILE"; then
+            printf 'CLAUDE_SESSION_ID=%s\n' "$_supersuit_sid" >> "$CLAUDE_ENV_FILE"
+        fi
+    fi
+    unset _supersuit_sid
+fi
+
 # Read using-superpowers content
 using_superpowers_content=$(cat "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
 
@@ -28,7 +53,7 @@ session_context="<EXTREMELY_IMPORTANT>\nYou have Supersuit (Superpowers-compatib
 
 workflow_map_header_agent="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nIf the registry entry has run/exec, execute scripts/run-workflow-action --id <id> (or equivalent harness exec with the same argv/allow rules). The executor always re-probes host capabilities (same conservative detect as SessionStart) and honors SUPERPOWERS_CAPABILITIES / --capabilities; when this JSON lists capabilities, pass them as --capabilities so advertised tokens cannot drop. Use the JSON outcome as on for the next lookup.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
 
-workflow_map_header_host="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nHOST_EXEC: exec-hook is advertised. If the next to is a run/exec id, do not invent argv and do not construct the program command line. Queue the handoff with hooks/workflow-exec --queue --from <completed-id> --on <outcome> (or --queue --id <id>), forwarding this JSON's capabilities as --capabilities, then stop. Claude Code Stop reads .supersuit/pending-handoff.json (Stop stdin is session_id/transcript_path/stop_hook_active — not from/on) and executes through run-workflow-action. Cursor: injected tool with --id or --from/--on (sessionStart is not exec-hook). Use the JSON outcome as on for the next lookup.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
+workflow_map_header_host="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nHOST_EXEC: exec-hook is advertised. If the next to is a run/exec id, do not invent argv and do not construct the program command line. Queue the handoff with hooks/workflow-exec --queue --from <completed-id> --on <outcome> --session-id <session_id> (or --queue --id <id> --session-id <session_id>; CLAUDE_SESSION_ID if already set — do not invent a token), forwarding this JSON's capabilities as --capabilities, then stop. Claude Code Stop reads .supersuit/pending-handoff.json (Stop stdin is session_id/transcript_path/stop_hook_active — not from/on) and claims only a file scoped to this session_id. Cursor: injected tool with --id or --from/--on (sessionStart is not exec-hook). Use the JSON outcome as on for the next lookup.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
 
 workflow_map_header_for() {
     local json="$1"

@@ -44,10 +44,12 @@ Rules:
 4. If the registry entry has `run` (or `exec`), do **not** load a skill. If
    `exec-hook` is in the map's `capabilities`, do **not** invent argv: queue
    the handoff with `hooks/workflow-exec --queue --from <completed-id>
-   --on <outcome>` (or `--queue --id <id>`), forward this map's
+   --on <outcome> --session-id <session_id>` (or `--queue --id <id>
+   --session-id <session_id>`; `CLAUDE_SESSION_ID` if already set — do
+   not invent a token), forward this map's
    capabilities, then stop. Claude Code Stop reads
    `.supersuit/pending-handoff.json` (Stop stdin has no `from`/`on`) and
-   executes through `run-workflow-action`. SessionStart running is not
+   claims only a file scoped to this session. SessionStart running is not
    `exec-hook`. Without that token, execute with `run-workflow-action
    --id <id>` (or an equivalent harness exec that uses the same argv/allow
    rules). The executor always re-probes host capabilities (same

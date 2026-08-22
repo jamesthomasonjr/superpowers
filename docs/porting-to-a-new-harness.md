@@ -395,8 +395,10 @@ closest, not to a single canonical template.
 **`exec-hook` is not SessionStart.** Shipping a session-start injector does
 not let you advertise `exec-hook`. That token means the host can run
 resolved `run`/`exec` ids outside the chat loop via `hooks/workflow-exec`
-(Claude Code: queue `.supersuit/pending-handoff.json`, then the plugin
-`Stop` hook consumes it — Stop stdin itself has no `from`/`on`; Cursor:
+(Claude Code: queue `.supersuit/pending-handoff.json` with `--session-id`,
+then the plugin `Stop` hook consumes it only when `session_id` matches —
+Stop stdin itself has no `from`/`on`; a Stop with no pending file and no
+`exec-hook` is silent idle; Cursor:
 an injected tool — not `sessionStart`). See
 [Advertising `exec-hook`](workflow-config.md#advertising-exec-hook).
 Do not infer the token from the product name.

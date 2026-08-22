@@ -367,6 +367,31 @@ else
     echo "$output" | sed 's/^/      /'
 fi
 
+echo "SessionStart persists real session_id to CLAUDE_ENV_FILE"
+
+persist_home="$(make_home persist-session-id)"
+persist_env="$TEST_ROOT/claude-session.env"
+rm -f "$persist_env"
+if output="$(cd "$TEST_ROOT" && env -i PATH="${PATH:-}" HOME="$persist_home" \
+  CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+  CLAUDE_ENV_FILE="$persist_env" \
+  bash "$HOOK_UNDER_TEST" 2>&1 <<'STDIN'
+{"session_id":"sess-persist-1","hook_event_name":"SessionStart"}
+STDIN
+)"; then
+    if [[ -f "$persist_env" ]] && grep -qx 'CLAUDE_SESSION_ID=sess-persist-1' "$persist_env"; then
+        pass "SessionStart persists real session_id to CLAUDE_ENV_FILE"
+    else
+        fail "SessionStart persists real session_id to CLAUDE_ENV_FILE"
+        echo "    env file: $(cat "$persist_env" 2>/dev/null || echo missing)"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "SessionStart persists real session_id to CLAUDE_ENV_FILE"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
+
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "STATUS: FAILED ($FAILURES failure(s))"
     exit 1

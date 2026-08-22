@@ -334,15 +334,29 @@ passes `--detect-capabilities`. Detect still only adds
 The mediator (`hooks/workflow-exec`, also `scripts/workflow-exec`)
 **always** goes through `run-workflow-action` (same allowlist and
 outcome map). It never invents argv. `--queue` writes
-`.supersuit/pending-handoff.json` (`from`/`on` or `id` only) and does
-not execute; Claude Code Stop claims that file (rename to
-`.in-progress`) and unlinks it only after `auto` or a definitive
-`not-run`. A resolve or advertisement failure restores the file and
-emits block JSON (exit 0) so a later Stop can retry. Without the
-advertised token it refuses to execute (`mode: agent-mediated`) so
-overlays can keep baseline skill edges, `wait`, or agent-run. Idle
-Stop (advertised token, no pending handoff) exits 0 without resolving
-overlays — an invalid project workflow must not block ending a session.
+`.supersuit/pending-handoff.json` (`from`/`on` or `id`, plus
+`session_id`) and does not execute. `--queue` requires `--session-id`
+or an already-set `CLAUDE_SESSION_ID` — Claude does not reliably export
+that env in Bash tool contexts, so pass the real Stop/SessionStart id
+(do not invent a token). SessionStart persists `CLAUDE_SESSION_ID` via
+`CLAUDE_ENV_FILE` when stdin carries `session_id`. Claude Code Stop
+claims that file (rename to `.in-progress`) only when the file's
+`session_id` matches Stop's `session_id`. Matching is fail-closed: a
+scoped Stop does not consume an unscoped (legacy) file, and an
+unscoped Stop does not consume a scoped file. A file with no
+`session_id` is project-global and is claimed only by a Stop that also
+has no session id. Stop unlinks the claim only after `auto` or a
+definitive `not-run`. A resolve or advertisement failure restores the
+file and emits block JSON (exit 0) so a later Stop can retry. Without
+the advertised token, an **explicit** `--id` / `--from` / `--on` or a
+Stop that **claimed** a pending file refuses to execute
+(`mode: agent-mediated`). A normal Stop with no pending handoff and no
+explicit exec is silent idle (exit 0, no `decision: block`) even when
+`exec-hook` is not advertised — that is the Superpowers baseline.
+`hooks.json` registers Stop for every Claude install; missing
+`exec-hook` must not block ending a turn. Idle Stop also exits 0
+without resolving overlays — an invalid project workflow must not
+block ending a session.
 
 There is no bundled overlay that adds run nodes for `exec-hook`.
 User/project overlays may gate enhanced edges:
@@ -359,7 +373,7 @@ when:
 
 | Harness | How to advertise | What "auto" means | Still agent-mediated |
 |---------|------------------|-------------------|----------------------|
-| Claude Code | `SUPERPOWERS_CAPABILITIES=exec-hook` | After a skill outcome, queue `hooks/workflow-exec --queue --from/--on` (no run argv). Stop consumes `.supersuit/pending-handoff.json` — Stop stdin is `session_id` / `transcript_path` / `stop_hook_active`, not `from`/`on`. A successful auto-exec injects `<WORKFLOW_EXEC_RESULT>` and blocks stop. The hook process always exits 0 so Claude applies the JSON; child `exit_code` stays in the body. Idle Stop (no pending handoff) exits 0 without resolving overlays. | Skill invokes; description-triggered skills; `run-workflow-action --id` if nothing was queued |
+| Claude Code | `SUPERPOWERS_CAPABILITIES=exec-hook` | After a skill outcome, queue `hooks/workflow-exec --queue --from/--on --session-id` (no run argv). Stop consumes `.supersuit/pending-handoff.json` only when `session_id` matches — Stop stdin is `session_id` / `transcript_path` / `stop_hook_active`, not `from`/`on`. A successful auto-exec injects `<WORKFLOW_EXEC_RESULT>` and blocks stop. The hook process always exits 0 so Claude applies the JSON; child `exit_code` stays in the body. Idle Stop (no pending handoff, or no `exec-hook` and no claimed file) exits 0 without `decision: block` and without resolving overlays. | Skill invokes; description-triggered skills; `run-workflow-action --id` if nothing was queued |
 | Cursor | same env | Injected tool / host mediator calling `hooks/workflow-exec --id` (or `--from` / `--on`). `sessionStart` is not `exec-hook`. | Same |
 | Copilot CLI / others | same env | Until a Stop or injected-tool event is wired, do not advertise | Agent calls `run-workflow-action --id` as in #10 |
 
