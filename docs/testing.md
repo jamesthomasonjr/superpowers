@@ -16,6 +16,7 @@ Live in `tests/`. Currently:
 - `tests/migration/` — bash tests for `scripts/migrate-to-supersuit` (prefix rewrite, do-not-touch cases, dir move, dry-run).
 - `tests/workflow/test-native-worktree.sh` — advertised vs missing `native-worktree`; handshake never runs `git worktree add`; SessionStart → `--id` capability round-trip.
 - `tests/workflow/test-visual-surface.sh` — advertised `native-canvas` prefers native surface; no advertisement falls back to companion server; declined/unavailable is text-only; never infer from harness/product names.
+- `tests/workflow/test-exec-hook.sh` — advertised `exec-hook` auto-path; missing token stays agent-mediated; product names / SessionStart env never invent the token; allowlist on the auto path; two-call capability round-trip.
 - `tests/claude-code/test-helpers.sh`, `analyze-token-usage.py` — utilities used by remaining bash tests.
 - `tests/claude-code/test-subagent-driven-development.sh` — agent-can-describe-SDD test (no drill counterpart; tests description-recall, not behavior).
 - `tests/claude-code/test-subagent-driven-development-integration.sh` — extended SDD integration with token analysis (drill covers the YAGNI subset; bash adds commit-count, Claude Code task-tracking, and token telemetry assertions).

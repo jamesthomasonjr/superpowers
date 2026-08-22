@@ -10,6 +10,7 @@ Config layers live under **`.supersuit/`** (canonical). Leftover `.superpowers/`
 - [Capability-aware overlays](superpowers/specs/2026-08-17-workflow-capability-overlays-design.md)
 - [Harness/external workspace preference](superpowers/specs/2026-08-21-native-worktree-preference-design.md)
 - [Visual-surface capability ladder](superpowers/specs/2026-08-21-visual-surface-ladder-design.md)
+- [Exec-hook host auto-path](superpowers/specs/2026-08-22-exec-hook-auto-path-design.md)
 
 ## Layer precedence
 
@@ -165,7 +166,7 @@ Place `when` on a transition and/or on a `skills.<id>` entry. The bundled `workf
 
 Active capabilities are the union of, in order (first-seen wins for display order):
 
-1. **Detect** — conservative process probes (see below). `resolve-workflow` probes only with `--detect-capabilities`. `run-workflow-action` always probes, so a documented `--id` invoke cannot drop SessionStart's `session-inject`.
+1. **Detect** — conservative process probes (see below). `resolve-workflow` probes only with `--detect-capabilities`. `run-workflow-action` and `hooks/workflow-exec` always probe, so a documented `--id` invoke cannot drop SessionStart's `session-inject`.
 2. **`SUPERPOWERS_CAPABILITIES`** — comma-separated tokens from the environment
 3. **`--capabilities`** — comma-separated CLI tokens (forward the resolved map's `capabilities` list here)
 
@@ -184,7 +185,7 @@ SessionStart passes `--detect-capabilities` and honors `SUPERPOWERS_CAPABILITIES
 | `session-inject` | Host injects bootstrap / workflow map at session start. | Yes, when `CURSOR_PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, or `COPILOT_CLI` is set (SessionStart-like env). |
 | `native-worktree` | Host owns worktree / workspace creation. | No. Advertise explicitly. Product name is not evidence. See [Advertising `native-worktree`](#advertising-native-worktree). |
 | `subagents` | Host supports subagent dispatch. | No. Advertise explicitly. |
-| `exec-hook` | Host can run deterministic workflow actions without the chat model mediating. | No. SessionStart running is not the same as an exec hook. |
+| `exec-hook` | Host can run deterministic workflow actions without the chat model mediating. | No. SessionStart running is not the same as an exec hook. See [Advertising `exec-hook`](#advertising-exec-hook). |
 | `native-canvas` | Host provides a native visual surface (e.g. Cursor Canvas). | No. Do not infer from `CURSOR_PLUGIN_ROOT`. See [Advertising `native-canvas`](#advertising-native-canvas). |
 
 A missing capability probe (no hook env, no env override, no `--capabilities`) yields an empty set. Gated overlays do not apply. That is intentional: fail toward the Superpowers baseline rather than claiming Canvas, worktrees, subagents, or exec hooks from a product name.
@@ -300,6 +301,65 @@ selector override the registry entry with the **same**
 Policy (JIT offer, own-message, per-question visual vs text) stays in
 `skills/brainstorming/SKILL.md`. Mechanics live in
 `skills/visual-surface/`.
+
+## Advertising `exec-hook`
+
+Hosts that can run deterministic workflow actions **outside the chat
+loop** (a Stop hook, an injected tool whose argv is only `--id` /
+`--from` / `--on`, or a stop-hook-style mediator) should **advertise**
+`exec-hook`. Do not infer it from the product name. SessionStart
+running is not `exec-hook`.
+
+```bash
+export SUPERPOWERS_CAPABILITIES=exec-hook
+```
+
+Or pass it on the CLI (and forward the resolved map's `capabilities`
+list into `hooks/workflow-exec` / `run-workflow-action` so the token
+cannot drop):
+
+```bash
+./scripts/resolve-workflow --plugin-root "$PWD" --project-root "$PWD" \
+  --user-home "$HOME" --capabilities exec-hook --pretty
+
+./hooks/workflow-exec --id ensure-fixture --plugin-root "$PWD" \
+  --project-root "$PWD" --user-home "$HOME" --capabilities exec-hook
+```
+
+SessionStart already honors `SUPERPOWERS_CAPABILITIES` and always
+passes `--detect-capabilities`. Detect still only adds
+`session-inject` from hook env. `exec-hook` must be in the env or
+`--capabilities`.
+
+The mediator (`hooks/workflow-exec`, also `scripts/workflow-exec`)
+**always** goes through `run-workflow-action` (same allowlist and
+outcome map). It never invents argv. Without the advertised token it
+refuses to execute (`mode: agent-mediated`) so overlays can keep
+baseline skill edges, `wait`, or agent-run.
+
+There is no bundled overlay that adds run nodes for `exec-hook`.
+User/project overlays may gate enhanced edges:
+
+```yaml
+when:
+  capabilities:
+    - exec-hook
+```
+
+`workflows/default.yaml` stays ungated and free of `run` keys.
+
+### What "auto" means per harness
+
+| Harness | How to advertise | What "auto" means | Still agent-mediated |
+|---------|------------------|-------------------|----------------------|
+| Claude Code | `SUPERPOWERS_CAPABILITIES=exec-hook` | Stop hook runs `hooks/workflow-exec`. A host tool may call the same script with `--id` or `--from` / `--on`. On a successful auto-exec the Stop hook injects `<WORKFLOW_EXEC_RESULT>` and blocks stop so the model continues from the JSON `outcome`. | Skill invokes; description-triggered skills; `run-workflow-action --id` if the host has not fired |
+| Cursor | same env | Injected tool / host mediator calling `hooks/workflow-exec --id` (or `--from` / `--on`). `sessionStart` is not `exec-hook`. | Same |
+| Copilot CLI / others | same env | Until a Stop or injected-tool event is wired, do not advertise | Agent calls `run-workflow-action --id` as in #10 |
+
+Capable hosts prefer a real hook or constrained tool over prose-only
+instructions. Fallback hosts keep today's SessionStart /
+`using-superpowers` guidance: the agent must call
+`run-workflow-action`.
 
 ## Example: replace brainstorming with a custom skill path
 
