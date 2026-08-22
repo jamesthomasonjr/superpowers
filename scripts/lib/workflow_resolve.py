@@ -1021,5 +1021,530 @@ def run_action_main(argv: list[str] | None = None) -> int:
     return 0 if result["exit_code"] == 0 else 1
 
 
+PENDING_HANDOFF_NAME = "pending-handoff.json"
+PENDING_HANDOFF_IN_PROGRESS_NAME = "pending-handoff.json.in-progress"
+
+
+def pending_handoff_path(project_root: Path) -> Path:
+    """Project-local durable handoff consumed by Claude Code Stop."""
+    return Path(project_root) / ".supersuit" / PENDING_HANDOFF_NAME
+
+
+def pending_handoff_in_progress_path(project_root: Path) -> Path:
+    return Path(project_root) / ".supersuit" / PENDING_HANDOFF_IN_PROGRESS_NAME
+
+
+def write_pending_handoff(project_root: Path, payload: dict[str, Any]) -> Path:
+    path = pending_handoff_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return path
+
+
+def _normalize_session_id(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    sid = value.strip()
+    return sid or None
+
+
+def queue_session_id(explicit: str | None = None) -> str | None:
+    """Session id for --queue: --session-id, else CLAUDE_SESSION_ID if already set.
+
+    Claude Stop stdin has ``session_id``; Bash tool contexts do not reliably
+    export it. We do not invent a token.
+    """
+    sid = _normalize_session_id(explicit)
+    if sid:
+        return sid
+    return _normalize_session_id(os.environ.get("CLAUDE_SESSION_ID"))
+
+
+def session_ids_compatible(file_sid: Any, request_sid: str | None) -> bool:
+    """Fail-closed pending-handoff isolation.
+
+    Claim only when both sides have the same id, or both have none
+    (legacy project-global). A scoped Stop must not consume an unscoped
+    file; an unscoped Stop must not consume a scoped file.
+    """
+    file_n = _normalize_session_id(file_sid)
+    req_n = _normalize_session_id(request_sid)
+    if file_n is None and req_n is None:
+        return True
+    return file_n is not None and req_n is not None and file_n == req_n
+
+
+def load_pending_handoff(
+    project_root: Path, session_id: str | None = None
+) -> dict[str, Any] | None:
+    path = pending_handoff_path(project_root)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    file_sid = data.get("session_id") or data.get("sessionId")
+    if not session_ids_compatible(file_sid, session_id):
+        return None
+    return data
+
+
+def claim_pending_handoff(
+    project_root: Path, session_id: str | None = None
+) -> dict[str, Any] | None:
+    """Rename pending → in-progress so a second Stop cannot double-exec."""
+    data = load_pending_handoff(project_root, session_id=session_id)
+    if data is None:
+        return None
+    src = pending_handoff_path(project_root)
+    dst = pending_handoff_in_progress_path(project_root)
+    try:
+        src.replace(dst)
+    except OSError:
+        return None
+    return data
+
+
+def restore_claimed_handoff(project_root: Path) -> None:
+    """Put a failed consume back so a later Stop can retry."""
+    src = pending_handoff_in_progress_path(project_root)
+    dst = pending_handoff_path(project_root)
+    if not src.is_file():
+        return
+    try:
+        src.replace(dst)
+    except OSError:
+        pass
+
+
+def consume_claimed_handoff(project_root: Path) -> None:
+    """Drop the in-progress claim after auto or definitive not-run."""
+    for path in (
+        pending_handoff_in_progress_path(project_root),
+        pending_handoff_path(project_root),
+    ):
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def consume_pending_handoff(project_root: Path) -> None:
+    consume_claimed_handoff(project_root)
+
+
+def lookup_transition_to(
+    resolved: dict[str, Any], from_id: str, on: str
+) -> tuple[bool, Any]:
+    """Return ``(found, to)`` for ``(from, on)``. Missing edges are not ``to: null``."""
+    for transition in resolved.get("transitions") or []:
+        if not isinstance(transition, dict):
+            continue
+        if transition.get("from") == from_id and transition.get("on") == on:
+            return True, transition.get("to")
+    return False, None
+
+
+def _skill_is_run(resolved: dict[str, Any], skill_id: str) -> bool:
+    skills = resolved.get("skills") or {}
+    entry = skills.get(skill_id)
+    if not isinstance(entry, dict):
+        return False
+    try:
+        normalized = normalize_skill_entry(entry)
+    except WorkflowResolveError:
+        return False
+    return "run" in normalized
+
+
+def _read_stdin_payload() -> dict[str, Any] | None:
+    if sys.stdin.isatty():
+        return None
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _extract_handoff(
+    payload: dict[str, Any] | None,
+) -> tuple[str | None, str | None, str | None]:
+    """Return ``(id, from, on)`` from a hook/tool JSON payload."""
+    if not payload:
+        return None, None, None
+    tool = payload.get("tool_input") or payload.get("toolInput") or {}
+    sources: list[dict[str, Any]] = []
+    if isinstance(tool, dict):
+        sources.append(tool)
+    sources.append(payload)
+    action_id = None
+    from_id = None
+    on = None
+    for src in sources:
+        if action_id is None and isinstance(src.get("id"), str) and src["id"]:
+            action_id = src["id"]
+        if from_id is None and isinstance(src.get("from"), str) and src["from"]:
+            from_id = src["from"]
+        if on is None and isinstance(src.get("on"), str) and src["on"]:
+            on = src["on"]
+    return action_id, from_id, on
+
+
+def _is_hook_event(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+    return any(
+        key in payload
+        for key in (
+            "session_id",
+            "sessionId",
+            "hook_event_name",
+            "hookEventName",
+            "stop_hook_active",
+            "stopHookActive",
+        )
+    )
+
+
+def _hook_event_output(result: dict[str, Any]) -> dict[str, Any]:
+    context = (
+        "<WORKFLOW_EXEC_RESULT>\n"
+        + json.dumps(result)
+        + "\n</WORKFLOW_EXEC_RESULT>"
+    )
+    if result.get("mode") == "auto":
+        reason = f"workflow-exec: {result.get('id')} → {result.get('outcome')}"
+    elif result.get("reason"):
+        reason = f"workflow-exec: {result.get('reason')}"
+    else:
+        reason = "workflow-exec"
+    if os.environ.get("CURSOR_PLUGIN_ROOT"):
+        return {
+            "additional_context": context,
+            "decision": "block",
+            "reason": reason,
+        }
+    if os.environ.get("CLAUDE_PLUGIN_ROOT") and not os.environ.get("COPILOT_CLI"):
+        return {
+            "decision": "block",
+            "reason": reason,
+            "hookSpecificOutput": {
+                "hookEventName": "Stop",
+                "additionalContext": context,
+            },
+        }
+    return {
+        "additionalContext": context,
+        "decision": "block",
+        "reason": reason,
+    }
+
+
+def run_workflow_exec(
+    *,
+    action_id: str | None = None,
+    from_id: str | None = None,
+    on: str | None = None,
+    plugin_root: Path,
+    project_root: Path,
+    user_home: Path,
+    bundled_only: bool = False,
+    capabilities: list[str] | None = None,
+) -> dict[str, Any]:
+    """Host mediator for advertised exec-hook. Never bypasses run_workflow_action."""
+    caps = list(capabilities or [])
+    if "exec-hook" not in caps:
+        return {
+            "mode": "agent-mediated",
+            "reason": "exec-hook not advertised",
+            "capabilities": caps,
+        }
+
+    looked_up_from = from_id
+    looked_up_on = on
+    if not action_id and (not from_id or on is None):
+        return {
+            "mode": "idle",
+            "reason": "no run id or from/on handoff",
+            "capabilities": caps,
+        }
+
+    resolved = resolve_workflow(
+        plugin_root=plugin_root,
+        project_root=project_root,
+        user_home=user_home,
+        bundled_only=bundled_only,
+        capabilities=caps,
+    )
+    if not action_id:
+        found, target = lookup_transition_to(resolved, from_id, on)
+        if not found:
+            return {
+                "mode": "not-run",
+                "from": from_id,
+                "on": on,
+                "to": "wait",
+                "capabilities": resolved.get("capabilities") or caps,
+            }
+        if target is None or target == "wait" or not _skill_is_run(
+            resolved, str(target)
+        ):
+            return {
+                "mode": "not-run",
+                "from": from_id,
+                "on": on,
+                "to": target,
+                "capabilities": resolved.get("capabilities") or caps,
+            }
+        action_id = str(target)
+
+    result = run_workflow_action(
+        action_id=action_id,
+        plugin_root=plugin_root,
+        project_root=project_root,
+        user_home=user_home,
+        bundled_only=bundled_only,
+        capabilities=caps,
+    )
+    result["mode"] = "auto"
+    result["capabilities"] = resolved.get("capabilities") or caps
+    if looked_up_from:
+        result["from"] = looked_up_from
+        result["on"] = looked_up_on
+    return result
+
+
+def workflow_exec_main(argv: list[str] | None = None) -> int:
+    """CLI / hook entry for advertised exec-hook auto-exec."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Host mediator for workflow run/exec when exec-hook is advertised. "
+            "Always delegates to the same allowlist/outcome executor as "
+            "run-workflow-action."
+        )
+    )
+    parser.add_argument("--id", help="Logical id of the run/exec registry entry")
+    parser.add_argument("--from", dest="from_id", help="Completed logical id")
+    parser.add_argument("--on", help="Emitted outcome for --from")
+    parser.add_argument(
+        "--queue",
+        action="store_true",
+        help=(
+            "Write .supersuit/pending-handoff.json (from/on or id only) and exit. "
+            "Claude Code Stop consumes it; do not pass the underlying run argv."
+        ),
+    )
+    parser.add_argument(
+        "--session-id",
+        dest="session_id",
+        help=(
+            "Scope a queued pending-handoff to this session. Required for "
+            "--queue unless CLAUDE_SESSION_ID is already set. Do not invent "
+            "a token — use Stop/SessionStart session_id."
+        ),
+    )
+    parser.add_argument(
+        "--plugin-root",
+        help="Plugin root (default: SUPERPOWERS_PLUGIN_ROOT or repository root)",
+    )
+    parser.add_argument(
+        "--project-root",
+        help="Project root (default: cwd)",
+    )
+    parser.add_argument(
+        "--user-home",
+        help="User home for overlays (default: HOME)",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output",
+    )
+    parser.add_argument(
+        "--bundled-only",
+        action="store_true",
+        help="Skip user and project overlays",
+    )
+    _add_capability_arguments(parser)
+    args = parser.parse_args(argv)
+    plugin_root, project_root, user_home = _cli_paths(args)
+    capabilities = _cli_capabilities(args, detect=True)
+
+    payload = None
+    claimed_pending = False
+    cli_target = bool(args.id or args.from_id or args.on or args.queue)
+    if not cli_target:
+        payload = _read_stdin_payload()
+        if payload and (
+            payload.get("stop_hook_active") is True
+            or payload.get("stopHookActive") is True
+        ):
+            # Already in a Stop continuation — do not loop.
+            return 0
+        extracted_id, extracted_from, extracted_on = _extract_handoff(payload)
+        if extracted_id:
+            args.id = extracted_id
+        if extracted_from:
+            args.from_id = extracted_from
+        if extracted_on:
+            args.on = extracted_on
+        if not args.id and not args.from_id:
+            session_id = None
+            if payload:
+                raw_sid = payload.get("session_id") or payload.get("sessionId")
+                if isinstance(raw_sid, str) and raw_sid:
+                    session_id = raw_sid
+            pending = claim_pending_handoff(project_root, session_id=session_id)
+            claimed_pending = pending is not None
+            if pending:
+                extracted_id, extracted_from, extracted_on = _extract_handoff(pending)
+                if extracted_id:
+                    args.id = extracted_id
+                if extracted_from:
+                    args.from_id = extracted_from
+                if extracted_on:
+                    args.on = extracted_on
+
+    if args.queue:
+        if "exec-hook" not in capabilities:
+            print(
+                json.dumps(
+                    {
+                        "mode": "agent-mediated",
+                        "reason": "exec-hook not advertised",
+                        "capabilities": capabilities,
+                    },
+                    indent=2 if args.pretty else None,
+                )
+            )
+            return 2
+        if args.from_id and not args.on:
+            print("--from requires --on", file=sys.stderr)
+            return 1
+        if args.on and not args.from_id:
+            print("--on requires --from", file=sys.stderr)
+            return 1
+        if not args.id and not (args.from_id and args.on):
+            print("--queue requires --id or --from/--on", file=sys.stderr)
+            return 1
+        session_id = queue_session_id(args.session_id)
+        if not session_id:
+            print(
+                "--queue requires --session-id or CLAUDE_SESSION_ID "
+                "(do not invent a session token)",
+                file=sys.stderr,
+            )
+            return 1
+        queued: dict[str, Any] = {"session_id": session_id}
+        if args.id:
+            queued["id"] = args.id
+        if args.from_id:
+            queued["from"] = args.from_id
+            queued["on"] = args.on
+        path = write_pending_handoff(project_root, queued)
+        print(
+            json.dumps(
+                {
+                    "mode": "queued",
+                    "path": str(path),
+                    **queued,
+                    "capabilities": capabilities,
+                },
+                indent=2 if args.pretty else None,
+            )
+        )
+        return 0
+
+    if args.from_id and not args.on and not args.id:
+        if claimed_pending:
+            restore_claimed_handoff(project_root)
+        print("--from requires --on", file=sys.stderr)
+        return 1
+    if args.on and not args.from_id and not args.id:
+        if claimed_pending:
+            restore_claimed_handoff(project_root)
+        print("--on requires --from", file=sys.stderr)
+        return 1
+
+    hook_event = _is_hook_event(payload) and not cli_target
+    explicit_exec = bool(args.id or args.from_id or args.on)
+    # Superpowers baseline: a normal Stop with no queued work is silent idle,
+    # even when exec-hook is not advertised. Missing exec-hook is only a hook
+    # failure when this Stop claimed a pending file or an explicit exec was
+    # requested.
+    if hook_event and not claimed_pending and not explicit_exec:
+        return 0
+
+    def _finish_pending(mode: str | None) -> None:
+        if not claimed_pending:
+            return
+        if mode in {"auto", "not-run"}:
+            consume_claimed_handoff(project_root)
+        else:
+            restore_claimed_handoff(project_root)
+
+    def _hook_fail(result: dict[str, Any]) -> int:
+        _finish_pending(result.get("mode"))
+        print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
+        return 0
+
+    try:
+        result = run_workflow_exec(
+            action_id=args.id,
+            from_id=args.from_id,
+            on=args.on,
+            plugin_root=plugin_root,
+            project_root=project_root,
+            user_home=user_home,
+            bundled_only=args.bundled_only,
+            capabilities=capabilities,
+        )
+    except WorkflowResolveError as exc:
+        if hook_event:
+            return _hook_fail(
+                {
+                    "mode": "resolve-error",
+                    "reason": str(exc),
+                    "capabilities": capabilities,
+                }
+            )
+        _finish_pending(None)
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if hook_event and result.get("mode") == "auto":
+        _finish_pending("auto")
+        print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
+        # Claude Code drops stdout JSON when the hook process exits non-zero.
+        return 0
+    if hook_event and result.get("mode") == "not-run":
+        _finish_pending("not-run")
+        return 0
+    if hook_event and result.get("mode") == "agent-mediated":
+        return _hook_fail(result)
+    if hook_event and result.get("mode") == "idle":
+        _finish_pending("idle")
+        return 0
+
+    print(json.dumps(result, indent=2 if args.pretty else None))
+    mode = result.get("mode")
+    _finish_pending(mode)
+    if mode == "agent-mediated":
+        return 2
+    if mode == "auto":
+        return 0 if result.get("exit_code", 0) == 0 else 1
+    return 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--workflow-exec":
+        raise SystemExit(workflow_exec_main(sys.argv[2:]))
     raise SystemExit(main())
+

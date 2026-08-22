@@ -392,6 +392,17 @@ Claude Code shape is universal. Compare `hooks/hooks.json` and
 Claude Code uses. Match your `hooks-<harness>.json` to whichever existing file is
 closest, not to a single canonical template.
 
+**`exec-hook` is not SessionStart.** Shipping a session-start injector does
+not let you advertise `exec-hook`. That token means the host can run
+resolved `run`/`exec` ids outside the chat loop via `hooks/workflow-exec`
+(Claude Code: queue `.supersuit/pending-handoff.json` with `--session-id`,
+then the plugin `Stop` hook consumes it only when `session_id` matches —
+Stop stdin itself has no `from`/`on`; a Stop with no pending file and no
+`exec-hook` is silent idle; Cursor:
+an injected tool — not `sessionStart`). See
+[Advertising `exec-hook`](workflow-config.md#advertising-exec-hook).
+Do not infer the token from the product name.
+
 The hook **command string references a harness-provided plugin-root variable**,
 and its name differs per harness: `hooks.json` uses `${CLAUDE_PLUGIN_ROOT}`,
 `hooks-cursor.json` uses a relative path. Use

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Claude Code Stop (and other host hook/tool events) → workflow-exec mediator.
+# Without advertised exec-hook this is a no-op / agent-mediated refusal.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export SUPERPOWERS_PLUGIN_ROOT="${SUPERPOWERS_PLUGIN_ROOT:-${PLUGIN_ROOT}}"
+exec bash "${PLUGIN_ROOT}/scripts/workflow-exec" --plugin-root "${PLUGIN_ROOT}" "$@"

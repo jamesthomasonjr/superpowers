@@ -41,13 +41,22 @@ Rules:
    map for `(from=<logical id>, on=<outcome>)`.
 3. `to: <id>` — invoke that logical id. Resolve via the map's skills registry:
    `run`/`exec` → `path` → `skill` alias → same name.
-4. If the registry entry has `run` (or `exec`), do **not** load a skill. Execute
-   it with `run-workflow-action --id <id>` (or an equivalent harness exec that
-   uses the same argv/allow rules). The executor always re-probes host
-   capabilities (same conservative detect as SessionStart) and reads
+4. If the registry entry has `run` (or `exec`), do **not** load a skill. If
+   `exec-hook` is in the map's `capabilities`, do **not** invent argv: queue
+   the handoff with `hooks/workflow-exec --queue --from <completed-id>
+   --on <outcome> --session-id <session_id>` (or `--queue --id <id>
+   --session-id <session_id>`; `CLAUDE_SESSION_ID` if already set — do
+   not invent a token), forward this map's
+   capabilities, then stop. Claude Code Stop reads
+   `.supersuit/pending-handoff.json` (Stop stdin has no `from`/`on`) and
+   claims only a file scoped to this session. SessionStart running is not
+   `exec-hook`. Without that token, execute with `run-workflow-action
+   --id <id>` (or an equivalent harness exec that uses the same argv/allow
+   rules). The executor always re-probes host capabilities (same
+   conservative detect as SessionStart) and reads
    `SUPERPOWERS_CAPABILITIES` / `--capabilities`. When the map lists
-   `capabilities`, pass them through: `--capabilities` plus those tokens — so
-   advertised tokens cannot drift off `session-inject`. Read the JSON
+   `capabilities`, pass them through: `--capabilities` plus those tokens —
+   so advertised tokens cannot drift off `session-inject`. Read the JSON
    `outcome`, then continue the map for `(from=<id>, on=<outcome>)`.
    If `native-worktree` is in the map's `capabilities`, `using-git-worktrees`
    and `ensure-worktree` are `run` actions. Do not load the worktree skill

@@ -226,8 +226,8 @@ echo "SessionStart workflow map injection tests"
 assert_command_output \
     "Cursor injects WORKFLOW_MAP with resolved transitions" \
     "cursor" \
-    "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject" \
-    "\"native-canvas\""$'\037'"\"to\": \"ensure-worktree\"" \
+    "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject"$'\037'"run-workflow-action" \
+    "\"native-canvas\""$'\037'"\"to\": \"ensure-worktree\""$'\037'"\"exec-hook\""$'\037'"HOST_EXEC" \
     "$cursor_home" \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
@@ -253,6 +253,17 @@ assert_command_output \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
     SUPERPOWERS_CAPABILITIES=native-canvas \
+    bash "$HOOK_UNDER_TEST"
+
+assert_command_output \
+    "SessionStart with SUPERPOWERS_CAPABILITIES=exec-hook injects HOST_EXEC" \
+    "cursor" \
+    "WORKFLOW_MAP"$'\037'"HOST_EXEC"$'\037'"hooks/workflow-exec"$'\037'"--queue"$'\037'"pending-handoff"$'\037'"\"capabilities\": [\"session-inject\", \"exec-hook\"]"$'\037'"do not invent argv" \
+    "\"to\": \"ensure-worktree\"" \
+    "$cursor_home" \
+    CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    SUPERPOWERS_CAPABILITIES=exec-hook \
     bash "$HOOK_UNDER_TEST"
 
 bad_proj="$TEST_ROOT/bad-workflow-proj"
@@ -352,6 +363,115 @@ for (const text of forbidden) {
     fi
 else
     fail "total resolve failure warns without claiming bundled map"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
+
+echo "SessionStart persists real session_id to CLAUDE_ENV_FILE"
+
+persist_home="$(make_home persist-session-id)"
+persist_env="$TEST_ROOT/claude-session.env"
+rm -f "$persist_env"
+if output="$(cd "$TEST_ROOT" && env -i PATH="${PATH:-}" HOME="$persist_home" \
+  CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+  CLAUDE_ENV_FILE="$persist_env" \
+  bash "$HOOK_UNDER_TEST" 2>&1 <<'STDIN'
+{"session_id":"sess-persist-1","hook_event_name":"SessionStart"}
+STDIN
+)"; then
+    if [[ -f "$persist_env" ]] && grep -qx 'export CLAUDE_SESSION_ID=sess-persist-1' "$persist_env" && \
+      env -i PATH="${PATH:-}" bash -c 'source "$1" && python3 -c "import os,sys; sys.exit(0 if os.environ.get(\"CLAUDE_SESSION_ID\")==\"sess-persist-1\" else 1)"' \
+        _ "$persist_env"
+    then
+        pass "SessionStart persists export CLAUDE_SESSION_ID so a sourced child sees it"
+    else
+        fail "SessionStart persists export CLAUDE_SESSION_ID so a sourced child sees it"
+        echo "    env file: $(cat "$persist_env" 2>/dev/null || echo missing)"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "SessionStart persists export CLAUDE_SESSION_ID so a sourced child sees it"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
+
+echo "SessionStart replaces stale CLAUDE_SESSION_ID from stdin"
+
+stale_home="$(make_home persist-stale-session-id)"
+stale_env="$TEST_ROOT/claude-session-stale.env"
+printf '%s\n' 'export OTHER_HOOK=keep-me' 'export CLAUDE_SESSION_ID=old-sid' > "$stale_env"
+EXEC="$REPO_ROOT/hooks/workflow-exec"
+QUEUE_PROJ="$TEST_ROOT/stale-queue-proj"
+mkdir -p "$QUEUE_PROJ"
+if output="$(cd "$TEST_ROOT" && env -i PATH="${PATH:-}" HOME="$stale_home" \
+  CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+  CLAUDE_SESSION_ID=old-sid CLAUDE_ENV_FILE="$stale_env" \
+  bash "$HOOK_UNDER_TEST" 2>&1 <<'STDIN'
+{"session_id":"brand-new-sid","hook_event_name":"SessionStart"}
+STDIN
+)"; then
+    if [[ -f "$stale_env" ]] && grep -qx 'export CLAUDE_SESSION_ID=brand-new-sid' "$stale_env" && \
+      grep -qx 'export OTHER_HOOK=keep-me' "$stale_env" && \
+      ! grep -q 'old-sid' "$stale_env"
+    then
+        set +e
+        QUEUE_OUT="$(cd "$QUEUE_PROJ" && env -i PATH="${PATH:-}" HOME="$stale_home" \
+          bash -c 'source "$1" && shift && exec "$@"' _ "$stale_env" \
+          "$EXEC" --queue --from brainstorming --on approved-architectural \
+          --plugin-root "$REPO_ROOT" --project-root "$QUEUE_PROJ" --user-home "$stale_home" \
+          --capabilities exec-hook)"
+        QUEUE_STATUS=$?
+        set -e
+        if [[ "$QUEUE_STATUS" -eq 0 ]] && python3 -c 'import json,sys
+d=json.loads(sys.stdin.read())
+assert d["mode"]=="queued", d
+assert d.get("session_id")=="brand-new-sid", d
+' <<<"$QUEUE_OUT" && \
+          python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+assert d.get("session_id")=="brand-new-sid", d
+' "$QUEUE_PROJ/.supersuit/pending-handoff.json"
+        then
+            pass "SessionStart replaces stale CLAUDE_SESSION_ID; --queue without --session-id uses stdin id"
+        else
+            fail "SessionStart replaces stale CLAUDE_SESSION_ID; --queue without --session-id uses stdin id"
+            echo "    env file: $(cat "$stale_env" 2>/dev/null || echo missing)"
+            echo "    queue status=$QUEUE_STATUS out=$QUEUE_OUT"
+        fi
+    else
+        fail "SessionStart replaces stale CLAUDE_SESSION_ID; --queue without --session-id uses stdin id"
+        echo "    env file: $(cat "$stale_env" 2>/dev/null || echo missing)"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "SessionStart replaces stale CLAUDE_SESSION_ID; --queue without --session-id uses stdin id"
+    echo "    hook exited non-zero"
+    echo "$output" | sed 's/^/      /'
+fi
+
+echo "SessionStart without stdin session_id does not invent one"
+
+no_sid_home="$(make_home persist-no-stdin-sid)"
+no_sid_env="$TEST_ROOT/claude-session-no-sid.env"
+printf '%s\n' 'export OTHER_HOOK=keep-me' > "$no_sid_env"
+if output="$(cd "$TEST_ROOT" && env -i PATH="${PATH:-}" HOME="$no_sid_home" \
+  CURSOR_PLUGIN_ROOT="$REPO_ROOT" CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+  CLAUDE_SESSION_ID=process-old CLAUDE_ENV_FILE="$no_sid_env" \
+  bash "$HOOK_UNDER_TEST" 2>&1 <<'STDIN'
+{"hook_event_name":"SessionStart"}
+STDIN
+)"; then
+    if grep -qx 'export OTHER_HOOK=keep-me' "$no_sid_env" && \
+      ! grep -q 'CLAUDE_SESSION_ID' "$no_sid_env"
+    then
+        pass "SessionStart without stdin session_id does not invent one"
+    else
+        fail "SessionStart without stdin session_id does not invent one"
+        echo "    env file: $(cat "$no_sid_env" 2>/dev/null || echo missing)"
+        echo "$output" | sed 's/^/      /'
+    fi
+else
+    fail "SessionStart without stdin session_id does not invent one"
     echo "    hook exited non-zero"
     echo "$output" | sed 's/^/      /'
 fi
