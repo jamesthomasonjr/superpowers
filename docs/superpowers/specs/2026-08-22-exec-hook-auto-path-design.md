@@ -50,7 +50,7 @@ That leaves a gap:
 | 2 | Gate execution on advertised `exec-hook` only. Missing token returns `mode: agent-mediated` and does not run. | Absence must be usable so overlays can choose wait / thin skill / agent-run. |
 | 3 | Always delegate to `run_workflow_action()`. | Same allowlist and outcome contract as #10. |
 | 4 | Accept `--id` or `--from` / `--on` (and the same fields on hook/tool JSON stdin). | The model already emits `(from, on)`; the host looks up `to` and must not invent argv. |
-| 5 | Claude Code registers a `Stop` hook that runs the mediator. Idle stdin is a no-op. A successful auto-exec injects `<WORKFLOW_EXEC_RESULT>` and blocks stop. `stop_hook_active` does not loop. | Real hook injection where the harness supports it. |
+| 5 | Claude Code Stop stdin is `session_id` / `transcript_path` / `stop_hook_active` — not `from`/`on`. Auto-exec uses a durable `.supersuit/pending-handoff.json` written by `--queue --from/--on` (no run argv). Stop consumes that file and runs `run_workflow_action`. Idle Stop (no queue) returns `mode: idle` **before** `resolve_workflow` so an invalid overlay cannot exit 1. Hook-event auto-exec always exits 0 after printing block JSON so Claude applies the body; child `exit_code` stays inside `<WORKFLOW_EXEC_RESULT>`. `stop_hook_active` does not loop. Transcript parsing is not the path. | Real Stop auto-exec that matches the stdin Claude actually sends. |
 | 6 | Cursor `sessionStart` is not `exec-hook`. Document Cursor auto as an injected tool calling the same mediator. | Do not overclaim a hook event Cursor does not ship. |
 | 7 | SessionStart header is capability-conditional (`HOST_EXEC` vs today's agent-mediated `run-workflow-action` text). | Fallback hosts keep #10 guidance. |
 | 8 | No bundled overlay for `exec-hook`. | The token is an execution mode, not a graph feature. Tests use a project overlay fixture. |
@@ -67,16 +67,21 @@ That leaves a gap:
 # Same lookup without naming the run id:
 ./hooks/workflow-exec --from brainstorming --on approved-architectural \
   --capabilities session-inject,exec-hook
+
+# Claude Code: queue from/on only, then stop. Stop consumes the file.
+./hooks/workflow-exec --queue --from brainstorming --on approved-architectural \
+  --capabilities session-inject,exec-hook
 ```
 
 Stdout JSON includes `mode`:
 
 | `mode` | Meaning | Exit |
 |--------|---------|------|
-| `auto` | Ran the allowlisted argv via `run-workflow-action`. | 0 if child 0, else 1 |
+| `auto` | Ran the allowlisted argv via `run-workflow-action`. | CLI: 0 if child 0, else 1. Hook event: always 0 after emitting block JSON. |
+| `queued` | Wrote `.supersuit/pending-handoff.json`; did not execute. | 0 |
 | `agent-mediated` | `exec-hook` not advertised; did not execute. | 2 |
 | `not-run` | Next `to` is a skill / `null` / `wait`. | 0 |
-| `idle` | Hook fired with no id or from/on. | 0 |
+| `idle` | Hook fired with no id, from/on, or pending handoff. Does not resolve overlays. | 0 |
 
 ## Success criteria
 
@@ -94,7 +99,7 @@ Stdout JSON includes `mode`:
 | Leave agent-only (#10 as-is) | Weak determinism; the problem statement. |
 | Always require a harness orchestrator | Excludes hosts without hooks. |
 | Infer exec-hook from Claude/Cursor env | Overclaim; forbidden by #6. |
-| Transcript-parsing Stop hook as the only path | Fragile; harness-specific. |
+| Transcript-parsing Stop hook as the only path | Fragile; harness-specific. Durable `--queue` + pending-handoff is the Stop contract. |
 | Second token (`auto-exec`) | Forbidden. |
 | Bypass `run-workflow-action` | Splits allowlist/outcome contracts. |
 | Gate native-worktree / native-canvas on exec-hook | Those PRs explicitly decoupled workspace/visual ownership from auto-exec. |

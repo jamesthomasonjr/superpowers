@@ -418,7 +418,7 @@ if [[ -x "$EXEC" ]] && OUT="$(cd "$AUTO" && SUPERPOWERS_EXEC_MARKER="$MARKER" en
   CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
   "$EXEC" --plugin-root "$REPO_ROOT" --project-root "$AUTO" --user-home "$TEST_HOME" \
   --capabilities exec-hook <<'STDIN'
-{"session_id":"t","stop_hook_active":false}
+{"session_id":"t","transcript_path":"/tmp/t.jsonl","stop_hook_active":false}
 STDIN
 )"; then
   if [[ -f "$MARKER" ]]; then
@@ -433,6 +433,142 @@ else
   else
     fail "hook stdin idle without payload does not execute"
   fi
+fi
+
+echo "=== idle Stop + invalid overlay + exec-hook does not kill the session ==="
+BAD="$TEST_ROOT/invalid-overlay-proj"
+mkdir -p "$BAD/.supersuit"
+printf 'version: "nope"\n' > "$BAD/.supersuit/workflow.yaml"
+set +e
+OUT="$(cd "$BAD" && env -u SUPERPOWERS_CAPABILITIES \
+  CLAUDE_PLUGIN_ROOT="$REPO_ROOT" SUPERPOWERS_CAPABILITIES=exec-hook \
+  "$EXEC" --plugin-root "$REPO_ROOT" --project-root "$BAD" --user-home "$TEST_HOME" \
+  --capabilities exec-hook 2>"$TEST_ROOT/err-idle-invalid.txt" <<'STDIN'
+{"session_id":"s1","transcript_path":"/tmp/t.jsonl","stop_hook_active":false}
+STDIN
+)"
+STATUS=$?
+set -e
+if [[ "$STATUS" -eq 0 ]] && ! grep -q "unsupported version" "$TEST_ROOT/err-idle-invalid.txt"; then
+  pass "idle Stop + invalid overlay exits 0 without resolving"
+else
+  fail "idle Stop + invalid overlay exits 0 without resolving"
+  echo "    status=$STATUS out=$OUT"
+  sed 's/^/    /' "$TEST_ROOT/err-idle-invalid.txt"
+fi
+
+echo "=== hook-event failed child still emits block JSON and exits 0 ==="
+FAILP="$TEST_ROOT/fail-child-proj"
+write_overlay "$FAILP"
+cat > "$FAILP/scripts/ensure-fixture.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n "${SUPERPOWERS_EXEC_MARKER:-}" ]]; then
+  printf 'ran\n' > "$SUPERPOWERS_EXEC_MARKER"
+fi
+exit 7
+EOF
+chmod +x "$FAILP/scripts/ensure-fixture.sh"
+MARKER="$TEST_ROOT/fail-child.marker"
+rm -f "$MARKER"
+set +e
+OUT="$(cd "$FAILP" && SUPERPOWERS_EXEC_MARKER="$MARKER" env -u SUPERPOWERS_CAPABILITIES \
+  CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+  "$EXEC" --plugin-root "$REPO_ROOT" --project-root "$FAILP" --user-home "$TEST_HOME" \
+  --capabilities exec-hook 2>"$TEST_ROOT/err-fail-child.txt" <<'STDIN'
+{"session_id":"s-fail","transcript_path":"/tmp/t.jsonl","stop_hook_active":false,"id":"ensure-fixture"}
+STDIN
+)"
+STATUS=$?
+set -e
+write_json "${OUT:-}"
+if [[ "$STATUS" -eq 0 ]] && [[ -f "$MARKER" ]] && python3 - "$JSON_FILE" <<'PY'
+import json, sys
+outer = json.load(open(sys.argv[1]))
+assert outer.get("decision") == "block", outer
+ctx = outer["hookSpecificOutput"]["additionalContext"]
+start = ctx.index("<WORKFLOW_EXEC_RESULT>") + len("<WORKFLOW_EXEC_RESULT>")
+end = ctx.index("</WORKFLOW_EXEC_RESULT>")
+inner = json.loads(ctx[start:end].strip())
+assert inner["mode"] == "auto", inner
+assert inner["exit_code"] == 7, inner
+assert inner["outcome"] == "failed", inner
+PY
+then
+  pass "hook-event failed child prints block JSON and exits 0"
+else
+  fail "hook-event failed child prints block JSON and exits 0"
+  echo "    status=$STATUS out=$OUT"
+  sed 's/^/    /' "$TEST_ROOT/err-fail-child.txt"
+fi
+
+echo "=== real Claude Stop stdin + pending handoff auto-executes ==="
+PEND="$TEST_ROOT/pending-stop-proj"
+write_overlay "$PEND"
+MARKER="$TEST_ROOT/pending-stop.marker"
+rm -f "$MARKER"
+if ! OUT="$(cd "$PEND" && env -u SUPERPOWERS_CAPABILITIES \
+  "$EXEC" --queue --from brainstorming --on approved-architectural \
+  --plugin-root "$REPO_ROOT" --project-root "$PEND" --user-home "$TEST_HOME" \
+  --capabilities exec-hook)"; then
+  fail "real Claude Stop stdin + pending handoff auto-executes"
+  echo "    --queue failed: $OUT"
+else
+  write_json "$OUT"
+  if [[ -f "$PEND/.supersuit/pending-handoff.json" ]] && python3 - "$JSON_FILE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["mode"] == "queued", d
+assert d["from"] == "brainstorming"
+assert d["on"] == "approved-architectural"
+PY
+  then
+    set +e
+    OUT="$(cd "$PEND" && SUPERPOWERS_EXEC_MARKER="$MARKER" env -u SUPERPOWERS_CAPABILITIES \
+      CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+      "$EXEC" --plugin-root "$REPO_ROOT" --project-root "$PEND" --user-home "$TEST_HOME" \
+      --capabilities exec-hook 2>"$TEST_ROOT/err-pending-stop.txt" <<'STDIN'
+{"session_id":"abc-123","transcript_path":"/tmp/transcript.jsonl","stop_hook_active":false}
+STDIN
+)"
+    STATUS=$?
+    set -e
+    write_json "${OUT:-}"
+    if [[ "$STATUS" -eq 0 ]] && [[ -f "$MARKER" ]] && [[ ! -f "$PEND/.supersuit/pending-handoff.json" ]] && python3 - "$JSON_FILE" <<'PY'
+import json, sys
+outer = json.load(open(sys.argv[1]))
+assert outer.get("decision") == "block", outer
+ctx = outer["hookSpecificOutput"]["additionalContext"]
+start = ctx.index("<WORKFLOW_EXEC_RESULT>") + len("<WORKFLOW_EXEC_RESULT>")
+end = ctx.index("</WORKFLOW_EXEC_RESULT>")
+inner = json.loads(ctx[start:end].strip())
+assert inner["mode"] == "auto", inner
+assert inner["id"] == "ensure-fixture"
+assert inner["from"] == "brainstorming"
+assert inner["on"] == "approved-architectural"
+assert inner["outcome"] == "complete"
+PY
+    then
+      pass "real Claude Stop stdin + pending handoff auto-executes"
+    else
+      fail "real Claude Stop stdin + pending handoff auto-executes"
+      echo "    status=$STATUS out=$OUT"
+      sed 's/^/    /' "$TEST_ROOT/err-pending-stop.txt"
+    fi
+  else
+    fail "real Claude Stop stdin + pending handoff auto-executes"
+    echo "    --queue did not write pending-handoff.json: $OUT"
+  fi
+fi
+
+echo "=== HOST_EXEC names pending-handoff + Stop, not Stop-alone ==="
+if grep -q 'pending-handoff' "$REPO_ROOT/hooks/session-start" &&
+  grep -q -- '--queue' "$REPO_ROOT/hooks/session-start" &&
+  ! grep -q 'Claude Code: Stop hook\.' "$REPO_ROOT/hooks/session-start"
+then
+  pass "HOST_EXEC names pending-handoff queue, not Stop-alone"
+else
+  fail "HOST_EXEC names pending-handoff queue, not Stop-alone"
 fi
 
 if [[ "$FAILURES" -gt 0 ]]; then

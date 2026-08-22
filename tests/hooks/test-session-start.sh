@@ -258,7 +258,7 @@ assert_command_output \
 assert_command_output \
     "SessionStart with SUPERPOWERS_CAPABILITIES=exec-hook injects HOST_EXEC" \
     "cursor" \
-    "WORKFLOW_MAP"$'\037'"HOST_EXEC"$'\037'"hooks/workflow-exec"$'\037'"\"capabilities\": [\"session-inject\", \"exec-hook\"]"$'\037'"do not invent argv" \
+    "WORKFLOW_MAP"$'\037'"HOST_EXEC"$'\037'"hooks/workflow-exec"$'\037'"--queue"$'\037'"pending-handoff"$'\037'"\"capabilities\": [\"session-inject\", \"exec-hook\"]"$'\037'"do not invent argv" \
     "\"to\": \"ensure-worktree\"" \
     "$cursor_home" \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \

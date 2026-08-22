@@ -1021,6 +1021,47 @@ def run_action_main(argv: list[str] | None = None) -> int:
     return 0 if result["exit_code"] == 0 else 1
 
 
+PENDING_HANDOFF_NAME = "pending-handoff.json"
+
+
+def pending_handoff_path(project_root: Path) -> Path:
+    """Project-local durable handoff consumed by Claude Code Stop."""
+    return Path(project_root) / ".supersuit" / PENDING_HANDOFF_NAME
+
+
+def write_pending_handoff(project_root: Path, payload: dict[str, Any]) -> Path:
+    path = pending_handoff_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return path
+
+
+def load_pending_handoff(
+    project_root: Path, session_id: str | None = None
+) -> dict[str, Any] | None:
+    path = pending_handoff_path(project_root)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    file_sid = data.get("session_id") or data.get("sessionId")
+    if session_id and file_sid and str(file_sid) != str(session_id):
+        return None
+    return data
+
+
+def consume_pending_handoff(project_root: Path) -> None:
+    path = pending_handoff_path(project_root)
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
 def lookup_transition_to(
     resolved: dict[str, Any], from_id: str, on: str
 ) -> tuple[bool, Any]:
@@ -1151,6 +1192,15 @@ def run_workflow_exec(
             "capabilities": caps,
         }
 
+    looked_up_from = from_id
+    looked_up_on = on
+    if not action_id and (not from_id or on is None):
+        return {
+            "mode": "idle",
+            "reason": "no run id or from/on handoff",
+            "capabilities": caps,
+        }
+
     resolved = resolve_workflow(
         plugin_root=plugin_root,
         project_root=project_root,
@@ -1158,16 +1208,7 @@ def run_workflow_exec(
         bundled_only=bundled_only,
         capabilities=caps,
     )
-
-    looked_up_from = from_id
-    looked_up_on = on
     if not action_id:
-        if not from_id or on is None:
-            return {
-                "mode": "idle",
-                "reason": "no run id or from/on handoff",
-                "capabilities": resolved.get("capabilities") or caps,
-            }
         found, target = lookup_transition_to(resolved, from_id, on)
         if not found:
             return {
@@ -1218,6 +1259,14 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--from", dest="from_id", help="Completed logical id")
     parser.add_argument("--on", help="Emitted outcome for --from")
     parser.add_argument(
+        "--queue",
+        action="store_true",
+        help=(
+            "Write .supersuit/pending-handoff.json (from/on or id only) and exit. "
+            "Claude Code Stop consumes it; do not pass the underlying run argv."
+        ),
+    )
+    parser.add_argument(
         "--plugin-root",
         help="Plugin root (default: SUPERPOWERS_PLUGIN_ROOT or repository root)",
     )
@@ -1245,7 +1294,7 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
     capabilities = _cli_capabilities(args, detect=True)
 
     payload = None
-    cli_target = bool(args.id or args.from_id or args.on)
+    cli_target = bool(args.id or args.from_id or args.on or args.queue)
     if not cli_target:
         payload = _read_stdin_payload()
         if payload and (
@@ -1261,6 +1310,64 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
             args.from_id = extracted_from
         if extracted_on:
             args.on = extracted_on
+        if not args.id and not args.from_id:
+            session_id = None
+            if payload:
+                raw_sid = payload.get("session_id") or payload.get("sessionId")
+                if isinstance(raw_sid, str) and raw_sid:
+                    session_id = raw_sid
+            pending = load_pending_handoff(project_root, session_id=session_id)
+            if pending:
+                consume_pending_handoff(project_root)
+                extracted_id, extracted_from, extracted_on = _extract_handoff(pending)
+                if extracted_id:
+                    args.id = extracted_id
+                if extracted_from:
+                    args.from_id = extracted_from
+                if extracted_on:
+                    args.on = extracted_on
+
+    if args.queue:
+        if "exec-hook" not in capabilities:
+            print(
+                json.dumps(
+                    {
+                        "mode": "agent-mediated",
+                        "reason": "exec-hook not advertised",
+                        "capabilities": capabilities,
+                    },
+                    indent=2 if args.pretty else None,
+                )
+            )
+            return 2
+        if args.from_id and not args.on:
+            print("--from requires --on", file=sys.stderr)
+            return 1
+        if args.on and not args.from_id:
+            print("--on requires --from", file=sys.stderr)
+            return 1
+        if not args.id and not (args.from_id and args.on):
+            print("--queue requires --id or --from/--on", file=sys.stderr)
+            return 1
+        queued: dict[str, Any] = {}
+        if args.id:
+            queued["id"] = args.id
+        if args.from_id:
+            queued["from"] = args.from_id
+            queued["on"] = args.on
+        path = write_pending_handoff(project_root, queued)
+        print(
+            json.dumps(
+                {
+                    "mode": "queued",
+                    "path": str(path),
+                    **queued,
+                    "capabilities": capabilities,
+                },
+                indent=2 if args.pretty else None,
+            )
+        )
+        return 0
 
     if args.from_id and not args.on and not args.id:
         print("--from requires --on", file=sys.stderr)
@@ -1269,6 +1376,7 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         print("--on requires --from", file=sys.stderr)
         return 1
 
+    hook_event = _is_hook_event(payload) and not cli_target
     try:
         result = run_workflow_exec(
             action_id=args.id,
@@ -1282,12 +1390,13 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         )
     except WorkflowResolveError as exc:
         print(str(exc), file=sys.stderr)
-        return 1
+        # Hook events must not kill the session (SessionStart already falls back).
+        return 0 if hook_event else 1
 
-    hook_event = _is_hook_event(payload) and not cli_target
     if hook_event and result.get("mode") == "auto":
         print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
-        return 0 if result.get("exit_code", 0) == 0 else 1
+        # Claude Code drops stdout JSON when the hook process exits non-zero.
+        return 0
     if hook_event and result.get("mode") in {"idle", "not-run", "agent-mediated"}:
         return 0
 
