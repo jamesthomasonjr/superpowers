@@ -1021,5 +1021,287 @@ def run_action_main(argv: list[str] | None = None) -> int:
     return 0 if result["exit_code"] == 0 else 1
 
 
+def lookup_transition_to(
+    resolved: dict[str, Any], from_id: str, on: str
+) -> tuple[bool, Any]:
+    """Return ``(found, to)`` for ``(from, on)``. Missing edges are not ``to: null``."""
+    for transition in resolved.get("transitions") or []:
+        if not isinstance(transition, dict):
+            continue
+        if transition.get("from") == from_id and transition.get("on") == on:
+            return True, transition.get("to")
+    return False, None
+
+
+def _skill_is_run(resolved: dict[str, Any], skill_id: str) -> bool:
+    skills = resolved.get("skills") or {}
+    entry = skills.get(skill_id)
+    if not isinstance(entry, dict):
+        return False
+    try:
+        normalized = normalize_skill_entry(entry)
+    except WorkflowResolveError:
+        return False
+    return "run" in normalized
+
+
+def _read_stdin_payload() -> dict[str, Any] | None:
+    if sys.stdin.isatty():
+        return None
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _extract_handoff(
+    payload: dict[str, Any] | None,
+) -> tuple[str | None, str | None, str | None]:
+    """Return ``(id, from, on)`` from a hook/tool JSON payload."""
+    if not payload:
+        return None, None, None
+    tool = payload.get("tool_input") or payload.get("toolInput") or {}
+    sources: list[dict[str, Any]] = []
+    if isinstance(tool, dict):
+        sources.append(tool)
+    sources.append(payload)
+    action_id = None
+    from_id = None
+    on = None
+    for src in sources:
+        if action_id is None and isinstance(src.get("id"), str) and src["id"]:
+            action_id = src["id"]
+        if from_id is None and isinstance(src.get("from"), str) and src["from"]:
+            from_id = src["from"]
+        if on is None and isinstance(src.get("on"), str) and src["on"]:
+            on = src["on"]
+    return action_id, from_id, on
+
+
+def _is_hook_event(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+    return any(
+        key in payload
+        for key in (
+            "session_id",
+            "sessionId",
+            "hook_event_name",
+            "hookEventName",
+            "stop_hook_active",
+            "stopHookActive",
+        )
+    )
+
+
+def _hook_event_output(result: dict[str, Any]) -> dict[str, Any]:
+    context = (
+        "<WORKFLOW_EXEC_RESULT>\n"
+        + json.dumps(result)
+        + "\n</WORKFLOW_EXEC_RESULT>"
+    )
+    reason = (
+        f"workflow-exec: {result.get('id')} → {result.get('outcome')}"
+        if result.get("mode") == "auto"
+        else "workflow-exec"
+    )
+    if os.environ.get("CURSOR_PLUGIN_ROOT"):
+        return {
+            "additional_context": context,
+            "decision": "block",
+            "reason": reason,
+        }
+    if os.environ.get("CLAUDE_PLUGIN_ROOT") and not os.environ.get("COPILOT_CLI"):
+        return {
+            "decision": "block",
+            "reason": reason,
+            "hookSpecificOutput": {
+                "hookEventName": "Stop",
+                "additionalContext": context,
+            },
+        }
+    return {
+        "additionalContext": context,
+        "decision": "block",
+        "reason": reason,
+    }
+
+
+def run_workflow_exec(
+    *,
+    action_id: str | None = None,
+    from_id: str | None = None,
+    on: str | None = None,
+    plugin_root: Path,
+    project_root: Path,
+    user_home: Path,
+    bundled_only: bool = False,
+    capabilities: list[str] | None = None,
+) -> dict[str, Any]:
+    """Host mediator for advertised exec-hook. Never bypasses run_workflow_action."""
+    caps = list(capabilities or [])
+    if "exec-hook" not in caps:
+        return {
+            "mode": "agent-mediated",
+            "reason": "exec-hook not advertised",
+            "capabilities": caps,
+        }
+
+    resolved = resolve_workflow(
+        plugin_root=plugin_root,
+        project_root=project_root,
+        user_home=user_home,
+        bundled_only=bundled_only,
+        capabilities=caps,
+    )
+
+    looked_up_from = from_id
+    looked_up_on = on
+    if not action_id:
+        if not from_id or on is None:
+            return {
+                "mode": "idle",
+                "reason": "no run id or from/on handoff",
+                "capabilities": resolved.get("capabilities") or caps,
+            }
+        found, target = lookup_transition_to(resolved, from_id, on)
+        if not found:
+            return {
+                "mode": "not-run",
+                "from": from_id,
+                "on": on,
+                "to": "wait",
+                "capabilities": resolved.get("capabilities") or caps,
+            }
+        if target is None or target == "wait" or not _skill_is_run(
+            resolved, str(target)
+        ):
+            return {
+                "mode": "not-run",
+                "from": from_id,
+                "on": on,
+                "to": target,
+                "capabilities": resolved.get("capabilities") or caps,
+            }
+        action_id = str(target)
+
+    result = run_workflow_action(
+        action_id=action_id,
+        plugin_root=plugin_root,
+        project_root=project_root,
+        user_home=user_home,
+        bundled_only=bundled_only,
+        capabilities=caps,
+    )
+    result["mode"] = "auto"
+    result["capabilities"] = resolved.get("capabilities") or caps
+    if looked_up_from:
+        result["from"] = looked_up_from
+        result["on"] = looked_up_on
+    return result
+
+
+def workflow_exec_main(argv: list[str] | None = None) -> int:
+    """CLI / hook entry for advertised exec-hook auto-exec."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Host mediator for workflow run/exec when exec-hook is advertised. "
+            "Always delegates to the same allowlist/outcome executor as "
+            "run-workflow-action."
+        )
+    )
+    parser.add_argument("--id", help="Logical id of the run/exec registry entry")
+    parser.add_argument("--from", dest="from_id", help="Completed logical id")
+    parser.add_argument("--on", help="Emitted outcome for --from")
+    parser.add_argument(
+        "--plugin-root",
+        help="Plugin root (default: SUPERPOWERS_PLUGIN_ROOT or repository root)",
+    )
+    parser.add_argument(
+        "--project-root",
+        help="Project root (default: cwd)",
+    )
+    parser.add_argument(
+        "--user-home",
+        help="User home for overlays (default: HOME)",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output",
+    )
+    parser.add_argument(
+        "--bundled-only",
+        action="store_true",
+        help="Skip user and project overlays",
+    )
+    _add_capability_arguments(parser)
+    args = parser.parse_args(argv)
+    plugin_root, project_root, user_home = _cli_paths(args)
+    capabilities = _cli_capabilities(args, detect=True)
+
+    payload = None
+    cli_target = bool(args.id or args.from_id or args.on)
+    if not cli_target:
+        payload = _read_stdin_payload()
+        if payload and (
+            payload.get("stop_hook_active") is True
+            or payload.get("stopHookActive") is True
+        ):
+            # Already in a Stop continuation — do not loop.
+            return 0
+        extracted_id, extracted_from, extracted_on = _extract_handoff(payload)
+        if extracted_id:
+            args.id = extracted_id
+        if extracted_from:
+            args.from_id = extracted_from
+        if extracted_on:
+            args.on = extracted_on
+
+    if args.from_id and not args.on and not args.id:
+        print("--from requires --on", file=sys.stderr)
+        return 1
+    if args.on and not args.from_id and not args.id:
+        print("--on requires --from", file=sys.stderr)
+        return 1
+
+    try:
+        result = run_workflow_exec(
+            action_id=args.id,
+            from_id=args.from_id,
+            on=args.on,
+            plugin_root=plugin_root,
+            project_root=project_root,
+            user_home=user_home,
+            bundled_only=args.bundled_only,
+            capabilities=capabilities,
+        )
+    except WorkflowResolveError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    hook_event = _is_hook_event(payload) and not cli_target
+    if hook_event and result.get("mode") == "auto":
+        print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
+        return 0 if result.get("exit_code", 0) == 0 else 1
+    if hook_event and result.get("mode") in {"idle", "not-run", "agent-mediated"}:
+        return 0
+
+    print(json.dumps(result, indent=2 if args.pretty else None))
+    mode = result.get("mode")
+    if mode == "agent-mediated":
+        return 2
+    if mode == "auto":
+        return 0 if result.get("exit_code", 0) == 0 else 1
+    return 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--workflow-exec":
+        raise SystemExit(workflow_exec_main(sys.argv[2:]))
     raise SystemExit(main())
+

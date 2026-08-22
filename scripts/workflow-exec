@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Host mediator for advertised exec-hook. Always delegates to the same
+# allowlist/outcome executor as run-workflow-action. Reads hook JSON on stdin
+# when --id / --from / --on are omitted.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$SCRIPT_DIR/lib/workflow_resolve.py" --workflow-exec "$@"

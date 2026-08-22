@@ -26,7 +26,23 @@ escape_for_json() {
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
 session_context="<EXTREMELY_IMPORTANT>\nYou have Supersuit (Superpowers-compatible skills).\n\n**Below is the full content of your 'supersuit:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
 
-workflow_map_header="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nIf the registry entry has run/exec, execute scripts/run-workflow-action --id <id> (or equivalent harness exec with the same argv/allow rules). The executor always re-probes host capabilities (same conservative detect as SessionStart) and honors SUPERPOWERS_CAPABILITIES / --capabilities; when this JSON lists capabilities, pass them as --capabilities so advertised tokens cannot drop. Use the JSON outcome as on for the next lookup.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
+workflow_map_header_agent="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nIf the registry entry has run/exec, execute scripts/run-workflow-action --id <id> (or equivalent harness exec with the same argv/allow rules). The executor always re-probes host capabilities (same conservative detect as SessionStart) and honors SUPERPOWERS_CAPABILITIES / --capabilities; when this JSON lists capabilities, pass them as --capabilities so advertised tokens cannot drop. Use the JSON outcome as on for the next lookup.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
+
+workflow_map_header_host="\n<WORKFLOW_MAP>\nHandoffs are authoritative. Skills are terminal — do not invent next skills.\nAfter a skill completes, use (from, on) -> to from this map.\nto: <id> invokes that logical id (resolve via skills registry: run/exec, then path, then skill alias, else same name).\nHOST_EXEC: exec-hook is advertised. If the registry entry has run/exec, do not invent argv and do not construct the program command line. The host executes hooks/workflow-exec --id <id> (or --from <completed-id> --on <outcome>) and forwards this JSON's capabilities as --capabilities. Claude Code: Stop hook. Cursor: injected tool (sessionStart is not exec-hook). The mediator always goes through run-workflow-action (same allowlist/outcome contract). Use the JSON outcome as on for the next lookup. If the host has not fired, trigger hooks/workflow-exec with --id or --from/--on only.\nto: null means no pipeline handoff; continue the session (description-triggered skills still apply).\nto: wait means stop and ask the human.\nMissing outcome in the map: treat as wait.\n\nRESOLVED_JSON\n"
+
+workflow_map_header_for() {
+    local json="$1"
+    if printf '%s' "$json" | python3 -c 'import json,sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if "exec-hook" in (data.get("capabilities") or []) else 1)'; then
+        printf '%s' "$workflow_map_header_host"
+    else
+        printf '%s' "$workflow_map_header_agent"
+    fi
+}
 
 workflow_suffix=""
 resolve_caps=(--detect-capabilities)
@@ -36,6 +52,7 @@ if resolved_json=$("${PLUGIN_ROOT}/scripts/resolve-workflow" \
     --user-home "${HOME}" \
     "${resolve_caps[@]}" 2>/dev/null); then
     resolved_json_escaped=$(escape_for_json "$resolved_json")
+    workflow_map_header="$(workflow_map_header_for "$resolved_json")"
     workflow_suffix="${workflow_map_header}${resolved_json_escaped}\n</WORKFLOW_MAP>"
 elif resolved_json=$("${PLUGIN_ROOT}/scripts/resolve-workflow" \
     --plugin-root "${PLUGIN_ROOT}" \
@@ -44,6 +61,7 @@ elif resolved_json=$("${PLUGIN_ROOT}/scripts/resolve-workflow" \
     --bundled-only \
     "${resolve_caps[@]}" 2>/dev/null); then
     resolved_json_escaped=$(escape_for_json "$resolved_json")
+    workflow_map_header="$(workflow_map_header_for "$resolved_json")"
     workflow_suffix="\nWORKFLOW_CONFIG_WARNING: workflow overlay invalid or resolve failed; using bundled defaults only.${workflow_map_header}${resolved_json_escaped}\n</WORKFLOW_MAP>"
 else
     workflow_suffix="\nWORKFLOW_CONFIG_WARNING: workflow resolve failed (including bundled defaults); no WORKFLOW_MAP available. Do not invent handoffs — ask the human."

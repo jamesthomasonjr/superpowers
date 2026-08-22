@@ -226,8 +226,8 @@ echo "SessionStart workflow map injection tests"
 assert_command_output \
     "Cursor injects WORKFLOW_MAP with resolved transitions" \
     "cursor" \
-    "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject" \
-    "\"native-canvas\""$'\037'"\"to\": \"ensure-worktree\"" \
+    "WORKFLOW_MAP"$'\037'"approved-architectural"$'\037'"\"capabilities\""$'\037'"session-inject"$'\037'"run-workflow-action" \
+    "\"native-canvas\""$'\037'"\"to\": \"ensure-worktree\""$'\037'"\"exec-hook\""$'\037'"HOST_EXEC" \
     "$cursor_home" \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
@@ -253,6 +253,17 @@ assert_command_output \
     CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
     SUPERPOWERS_CAPABILITIES=native-canvas \
+    bash "$HOOK_UNDER_TEST"
+
+assert_command_output \
+    "SessionStart with SUPERPOWERS_CAPABILITIES=exec-hook injects HOST_EXEC" \
+    "cursor" \
+    "WORKFLOW_MAP"$'\037'"HOST_EXEC"$'\037'"hooks/workflow-exec"$'\037'"\"capabilities\": [\"session-inject\", \"exec-hook\"]"$'\037'"do not invent argv" \
+    "\"to\": \"ensure-worktree\"" \
+    "$cursor_home" \
+    CURSOR_PLUGIN_ROOT="$REPO_ROOT" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    SUPERPOWERS_CAPABILITIES=exec-hook \
     bash "$HOOK_UNDER_TEST"
 
 bad_proj="$TEST_ROOT/bad-workflow-proj"
