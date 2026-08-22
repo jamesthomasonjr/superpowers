@@ -338,8 +338,13 @@ outcome map). It never invents argv. `--queue` writes
 `session_id`) and does not execute. `--queue` requires `--session-id`
 or an already-set `CLAUDE_SESSION_ID` — Claude does not reliably export
 that env in Bash tool contexts, so pass the real Stop/SessionStart id
-(do not invent a token). SessionStart persists `CLAUDE_SESSION_ID` via
-`CLAUDE_ENV_FILE` when stdin carries `session_id`. Claude Code Stop
+(do not invent a token). SessionStart persists the stdin `session_id`
+to `CLAUDE_ENV_FILE` as `export CLAUDE_SESSION_ID=...` (Claude sources
+that file as shell; a non-exported assignment does not reach child
+`os.environ`). A later SessionStart with a different stdin `session_id`
+replaces a stale line even if the process env or file already has a
+value. If stdin has no `session_id`, SessionStart does not invent one.
+Claude Code Stop
 claims that file (rename to `.in-progress`) only when the file's
 `session_id` matches Stop's `session_id`. Matching is fail-closed: a
 scoped Stop does not consume an unscoped (legacy) file, and an

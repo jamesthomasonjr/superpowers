@@ -7,13 +7,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Persist the real SessionStart session_id for later --queue isolation.
-# Claude Stop stdin has session_id; Bash tool contexts do not reliably export
-# CLAUDE_SESSION_ID. We do not invent a token — only stdin or an already-set env.
-if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ]; then
-    _supersuit_sid=""
-    if [ ! -t 0 ]; then
-        _supersuit_sid="$(python3 -c '
+# Persist the real SessionStart stdin session_id for later --queue isolation.
+# Claude sources CLAUDE_ENV_FILE as shell; documented form is `export VAR=value`
+# (https://code.claude.com/docs/en/hooks#sessionstart). Non-exported assignments
+# do not reach child process environments. We do not invent a token — only stdin.
+# A later SessionStart with a different session_id replaces a stale line even if
+# the process env or file already has CLAUDE_SESSION_ID.
+if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ ! -t 0 ]; then
+    _supersuit_sid="$(python3 -c '
 import json, re, sys
 try:
     data = json.load(sys.stdin)
@@ -23,13 +24,16 @@ raw = data.get("session_id") or data.get("sessionId") or ""
 if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9._:-]+", raw.strip()):
     sys.stdout.write(raw.strip())
 ' 2>/dev/null || true)"
-    fi
     if [ -n "$_supersuit_sid" ]; then
-        if [ ! -f "$CLAUDE_ENV_FILE" ] || ! grep -q '^CLAUDE_SESSION_ID=' "$CLAUDE_ENV_FILE"; then
-            printf 'CLAUDE_SESSION_ID=%s\n' "$_supersuit_sid" >> "$CLAUDE_ENV_FILE"
+        _supersuit_env_tmp="$(mktemp)"
+        if [ -f "$CLAUDE_ENV_FILE" ]; then
+            grep -v -E '^(export[[:space:]]+)?CLAUDE_SESSION_ID=' "$CLAUDE_ENV_FILE" \
+                > "$_supersuit_env_tmp" || true
         fi
+        printf 'export CLAUDE_SESSION_ID=%s\n' "$_supersuit_sid" >> "$_supersuit_env_tmp"
+        mv "$_supersuit_env_tmp" "$CLAUDE_ENV_FILE"
     fi
-    unset _supersuit_sid
+    unset _supersuit_sid _supersuit_env_tmp
 fi
 
 # Read using-superpowers content
