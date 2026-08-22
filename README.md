@@ -286,7 +286,7 @@ To rewire handoffs or replace a skill, add:
 
 Full reference and examples: [docs/workflow-config.md](docs/workflow-config.md).
 
-Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps, and **`when.capabilities`** gates for progressive enhancement — see the workflow config docs. `workflows/default.yaml` stays ungated and Superpowers-shaped. A bundled overlay prefers `ensure-worktree` when the host **advertises** `native-worktree` (never inferred from a product name).
+Overlays may also declare deterministic **`run` / `exec`** actions (allowlisted argv) for mechanical steps, and **`when.capabilities`** gates for progressive enhancement — see the workflow config docs. `workflows/default.yaml` stays ungated and Superpowers-shaped. Bundled overlays prefer `ensure-worktree` when the host **advertises** `native-worktree`, and prefer a native visual surface when it **advertises** `native-canvas` (never inferred from a product name). The companion server stays the portable default.
 
 Inspect the merged map:
 
@@ -315,7 +315,8 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 - **verification-before-completion** - Ensure it's actually fixed
 
 **Collaboration**
-- **brainstorming** - Socratic design refinement
+- **brainstorming** - Socratic design refinement (visual-surface offer is product-agnostic)
+- **visual-surface** - Native canvas vs companion server vs text-only ladder
 - **writing-plans** - Detailed implementation plans
 - **executing-plans** - Batch execution with checkpoints
 - **dispatching-parallel-agents** - Concurrent subagent workflows
@@ -332,9 +333,11 @@ Supersuit builds on **Superpowers** by [Jesse Vincent](https://blog.fsck.com) an
 **Workflow**
 - **`workflows/default.yaml`** - Bundled Superpowers-compatible pipeline graph
 - **`workflows/overlays/native-worktree.yaml`** - Gated `ensure-worktree` run when `native-worktree` is advertised
+- **`workflows/overlays/native-canvas.yaml`** - Gated `visual-surface` select run when `native-canvas` is advertised
 - **`scripts/resolve-workflow`** - Merge and validate overlays
 - **`scripts/run-workflow-action`** - Execute a deterministic `run`/`exec` registry entry
 - **`scripts/ensure-worktree`** - Host-owned workspace handshake (never `git worktree add`)
+- **`scripts/select-visual-surface`** - Native / companion / text-only ladder (never infers from product names)
 - **`scripts/migrate-to-supersuit`** - One-time Superpowers → Supersuit rewrite + dir move
 
 ## Philosophy

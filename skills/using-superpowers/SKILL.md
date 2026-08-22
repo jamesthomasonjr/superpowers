@@ -52,6 +52,12 @@ Rules:
    If `native-worktree` is in the map's `capabilities`, `using-git-worktrees`
    and `ensure-worktree` are `run` actions. Do not load the worktree skill
    and do not invent `git worktree` steps — the host owns workspace setup.
+   If `native-canvas` is in the map's `capabilities`, `visual-surface` is a
+   `run` action after the user accepts the visual-surface offer. Do not infer
+   Canvas from the product name. Outcome `native` → read
+   `skills/visual-surface/native-canvas.md`; `companion` →
+   `companion-server.md`; `text` → stay in chat. Without that token, load
+   `supersuit:visual-surface` (companion server is the portable default).
 5. `to: null` — no pipeline handoff; continue the session. Description-triggered
    skills (TDD, debugging, verification, etc.) still apply.
 6. `to: wait` — stop and ask your human partner what to do next.
