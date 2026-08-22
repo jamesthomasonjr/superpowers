@@ -335,7 +335,10 @@ The mediator (`hooks/workflow-exec`, also `scripts/workflow-exec`)
 **always** goes through `run-workflow-action` (same allowlist and
 outcome map). It never invents argv. `--queue` writes
 `.supersuit/pending-handoff.json` (`from`/`on` or `id` only) and does
-not execute; Claude Code Stop consumes that file. Without the
+not execute; Claude Code Stop claims that file (rename to
+`.in-progress`) and unlinks it only after `auto` or a definitive
+`not-run`. A resolve or advertisement failure restores the file and
+emits block JSON (exit 0) so a later Stop can retry. Without the
 advertised token it refuses to execute (`mode: agent-mediated`) so
 overlays can keep baseline skill edges, `wait`, or agent-run. Idle
 Stop (advertised token, no pending handoff) exits 0 without resolving

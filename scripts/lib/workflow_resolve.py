@@ -1022,11 +1022,16 @@ def run_action_main(argv: list[str] | None = None) -> int:
 
 
 PENDING_HANDOFF_NAME = "pending-handoff.json"
+PENDING_HANDOFF_IN_PROGRESS_NAME = "pending-handoff.json.in-progress"
 
 
 def pending_handoff_path(project_root: Path) -> Path:
     """Project-local durable handoff consumed by Claude Code Stop."""
     return Path(project_root) / ".supersuit" / PENDING_HANDOFF_NAME
+
+
+def pending_handoff_in_progress_path(project_root: Path) -> Path:
+    return Path(project_root) / ".supersuit" / PENDING_HANDOFF_IN_PROGRESS_NAME
 
 
 def write_pending_handoff(project_root: Path, payload: dict[str, Any]) -> Path:
@@ -1054,12 +1059,48 @@ def load_pending_handoff(
     return data
 
 
-def consume_pending_handoff(project_root: Path) -> None:
-    path = pending_handoff_path(project_root)
+def claim_pending_handoff(
+    project_root: Path, session_id: str | None = None
+) -> dict[str, Any] | None:
+    """Rename pending → in-progress so a second Stop cannot double-exec."""
+    data = load_pending_handoff(project_root, session_id=session_id)
+    if data is None:
+        return None
+    src = pending_handoff_path(project_root)
+    dst = pending_handoff_in_progress_path(project_root)
     try:
-        path.unlink()
+        src.replace(dst)
+    except OSError:
+        return None
+    return data
+
+
+def restore_claimed_handoff(project_root: Path) -> None:
+    """Put a failed consume back so a later Stop can retry."""
+    src = pending_handoff_in_progress_path(project_root)
+    dst = pending_handoff_path(project_root)
+    if not src.is_file():
+        return
+    try:
+        src.replace(dst)
     except OSError:
         pass
+
+
+def consume_claimed_handoff(project_root: Path) -> None:
+    """Drop the in-progress claim after auto or definitive not-run."""
+    for path in (
+        pending_handoff_in_progress_path(project_root),
+        pending_handoff_path(project_root),
+    ):
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def consume_pending_handoff(project_root: Path) -> None:
+    consume_claimed_handoff(project_root)
 
 
 def lookup_transition_to(
@@ -1145,11 +1186,12 @@ def _hook_event_output(result: dict[str, Any]) -> dict[str, Any]:
         + json.dumps(result)
         + "\n</WORKFLOW_EXEC_RESULT>"
     )
-    reason = (
-        f"workflow-exec: {result.get('id')} → {result.get('outcome')}"
-        if result.get("mode") == "auto"
-        else "workflow-exec"
-    )
+    if result.get("mode") == "auto":
+        reason = f"workflow-exec: {result.get('id')} → {result.get('outcome')}"
+    elif result.get("reason"):
+        reason = f"workflow-exec: {result.get('reason')}"
+    else:
+        reason = "workflow-exec"
     if os.environ.get("CURSOR_PLUGIN_ROOT"):
         return {
             "additional_context": context,
@@ -1294,6 +1336,7 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
     capabilities = _cli_capabilities(args, detect=True)
 
     payload = None
+    claimed_pending = False
     cli_target = bool(args.id or args.from_id or args.on or args.queue)
     if not cli_target:
         payload = _read_stdin_payload()
@@ -1316,9 +1359,9 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
                 raw_sid = payload.get("session_id") or payload.get("sessionId")
                 if isinstance(raw_sid, str) and raw_sid:
                     session_id = raw_sid
-            pending = load_pending_handoff(project_root, session_id=session_id)
+            pending = claim_pending_handoff(project_root, session_id=session_id)
+            claimed_pending = pending is not None
             if pending:
-                consume_pending_handoff(project_root)
                 extracted_id, extracted_from, extracted_on = _extract_handoff(pending)
                 if extracted_id:
                     args.id = extracted_id
@@ -1370,13 +1413,31 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.from_id and not args.on and not args.id:
+        if claimed_pending:
+            restore_claimed_handoff(project_root)
         print("--from requires --on", file=sys.stderr)
         return 1
     if args.on and not args.from_id and not args.id:
+        if claimed_pending:
+            restore_claimed_handoff(project_root)
         print("--on requires --from", file=sys.stderr)
         return 1
 
     hook_event = _is_hook_event(payload) and not cli_target
+
+    def _finish_pending(mode: str | None) -> None:
+        if not claimed_pending:
+            return
+        if mode in {"auto", "not-run"}:
+            consume_claimed_handoff(project_root)
+        else:
+            restore_claimed_handoff(project_root)
+
+    def _hook_fail(result: dict[str, Any]) -> int:
+        _finish_pending(result.get("mode"))
+        print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
+        return 0
+
     try:
         result = run_workflow_exec(
             action_id=args.id,
@@ -1389,19 +1450,35 @@ def workflow_exec_main(argv: list[str] | None = None) -> int:
             capabilities=capabilities,
         )
     except WorkflowResolveError as exc:
+        if hook_event:
+            return _hook_fail(
+                {
+                    "mode": "resolve-error",
+                    "reason": str(exc),
+                    "capabilities": capabilities,
+                }
+            )
+        _finish_pending(None)
         print(str(exc), file=sys.stderr)
-        # Hook events must not kill the session (SessionStart already falls back).
-        return 0 if hook_event else 1
+        return 1
 
     if hook_event and result.get("mode") == "auto":
+        _finish_pending("auto")
         print(json.dumps(_hook_event_output(result), indent=2 if args.pretty else None))
         # Claude Code drops stdout JSON when the hook process exits non-zero.
         return 0
-    if hook_event and result.get("mode") in {"idle", "not-run", "agent-mediated"}:
+    if hook_event and result.get("mode") == "not-run":
+        _finish_pending("not-run")
+        return 0
+    if hook_event and result.get("mode") == "agent-mediated":
+        return _hook_fail(result)
+    if hook_event and result.get("mode") == "idle":
+        _finish_pending("idle")
         return 0
 
     print(json.dumps(result, indent=2 if args.pretty else None))
     mode = result.get("mode")
+    _finish_pending(mode)
     if mode == "agent-mediated":
         return 2
     if mode == "auto":

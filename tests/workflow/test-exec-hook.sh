@@ -561,6 +561,50 @@ PY
   fi
 fi
 
+echo "=== queue then Stop on invalid overlay keeps file and emits block JSON ==="
+KEEP="$TEST_ROOT/queue-keep-proj"
+mkdir -p "$KEEP/.supersuit"
+printf 'version: "nope"\n' > "$KEEP/.supersuit/workflow.yaml"
+if ! OUT="$(cd "$KEEP" && env -u SUPERPOWERS_CAPABILITIES \
+  "$EXEC" --queue --from brainstorming --on approved-architectural \
+  --plugin-root "$REPO_ROOT" --project-root "$KEEP" --user-home "$TEST_HOME" \
+  --capabilities exec-hook)"; then
+  fail "queue then Stop on invalid overlay keeps file and emits block JSON"
+  echo "    --queue failed: $OUT"
+else
+  set +e
+  OUT="$(cd "$KEEP" && env -u SUPERPOWERS_CAPABILITIES \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$EXEC" --plugin-root "$REPO_ROOT" --project-root "$KEEP" --user-home "$TEST_HOME" \
+    --capabilities exec-hook 2>"$TEST_ROOT/err-queue-keep.txt" <<'STDIN'
+{"session_id":"keep-1","transcript_path":"/tmp/t.jsonl","stop_hook_active":false}
+STDIN
+)"
+  STATUS=$?
+  set -e
+  write_json "${OUT:-}"
+  if [[ "$STATUS" -eq 0 ]] && [[ -f "$KEEP/.supersuit/pending-handoff.json" ]] && python3 - "$JSON_FILE" <<'PY'
+import json, sys
+outer = json.load(open(sys.argv[1]))
+assert outer.get("decision") == "block", outer
+ctx = outer["hookSpecificOutput"]["additionalContext"]
+assert "<WORKFLOW_EXEC_RESULT>" in ctx, ctx
+start = ctx.index("<WORKFLOW_EXEC_RESULT>") + len("<WORKFLOW_EXEC_RESULT>")
+end = ctx.index("</WORKFLOW_EXEC_RESULT>")
+inner = json.loads(ctx[start:end].strip())
+assert inner.get("mode") != "auto", inner
+reason = json.dumps(inner) + ctx
+assert "unsupported version" in reason or "nope" in reason, inner
+PY
+  then
+    pass "queue then Stop on invalid overlay keeps file and emits block JSON"
+  else
+    fail "queue then Stop on invalid overlay keeps file and emits block JSON"
+    echo "    status=$STATUS out=$OUT file=$(ls -l "$KEEP/.supersuit/" 2>/dev/null || true)"
+    sed 's/^/    /' "$TEST_ROOT/err-queue-keep.txt"
+  fi
+fi
+
 echo "=== HOST_EXEC names pending-handoff + Stop, not Stop-alone ==="
 if grep -q 'pending-handoff' "$REPO_ROOT/hooks/session-start" &&
   grep -q -- '--queue' "$REPO_ROOT/hooks/session-start" &&
